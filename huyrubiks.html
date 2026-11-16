@@ -1,0 +1,3302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>H.Huy VibeCode — 3x3 Rubik's Cube Simulator & Universal Solver</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 70%, #020617 100%);
+      color: #f8fafc;
+      margin: 0;
+      overflow-x: hidden;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .glass {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .swatch-btn {
+      transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .swatch-btn.active {
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 0 0 3px #38bdf8, 0 8px 20px -4px rgba(56, 189, 248, 0.45);
+    }
+    .lang-btn {
+      transition: all 0.15s ease;
+    }
+    .lang-btn.active {
+      background: linear-gradient(135deg, #0284c7 0%, #4f46e5 100%);
+      color: #ffffff;
+      box-shadow: 0 0 0 2px #7dd3fc, 0 4px 12px rgba(2, 132, 199, 0.45);
+    }
+    .net-cell {
+      width: 26px;
+      height: 26px;
+      border-radius: 5px;
+      border: 1.5px solid rgba(15, 23, 42, 0.85);
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 800;
+      color: rgba(15, 23, 42, 0.75);
+    }
+    .net-cell:hover {
+      transform: scale(1.12);
+      z-index: 2;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.7);
+    }
+    .step-chip {
+      transition: all 0.15s ease;
+    }
+    .step-chip.current {
+      background: #0284c7 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 0 2px #7dd3fc, 0 4px 12px rgba(2, 132, 199, 0.5);
+      transform: scale(1.07);
+    }
+    .step-chip.done {
+      background: rgba(16, 185, 129, 0.2) !important;
+      color: #6ee7b7 !important;
+      border-color: rgba(16, 185, 129, 0.4) !important;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.4); }
+    ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.5); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.8); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOP HEADER -->
+  <header class="glass sticky top-0 z-30 px-3 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-sky-500/20 font-black text-base tracking-tighter">
+        3×3
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-white">H.Huy VibeCode</h1>
+          <span id="statusBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-700/80 text-slate-200 border border-slate-600">
+            54 gray cells — Ready to paint
+          </span>
+        </div>
+        <p id="headerSubtitle" class="text-[11px] text-slate-400 hidden sm:block">
+          Paint your real-life Rubik's Cube onto the 3D gray model & get step-by-step solutions for every case
+        </p>
+      </div>
+    </div>
+
+    <!-- Navigation Mode Tabs -->
+    <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/70">
+      <button id="tabPaintBtn" onclick="setAppMode('paint')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-sky-600 text-white shadow">
+        1. Paint Cube
+      </button>
+      <button id="tabSolveBtn" onclick="setAppMode('solve')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white">
+        2. 3D Solve Guide
+      </button>
+      <button id="tabCasesBtn" onclick="setAppMode('cases')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white">
+        3. All Cases Guide
+      </button>
+    </div>
+
+    <!-- Prominent Language Switcher + Quick Utility Controls -->
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- PROMINENT LANGUAGE SWITCHER -->
+      <div class="flex items-center gap-1 bg-slate-950/95 p-1 rounded-xl border-2 border-sky-500/50 shadow-lg shadow-sky-500/10" role="group" aria-label="Language Switcher">
+        <span class="text-xs pl-1.5 pr-0.5 text-sky-400 font-bold">🌐</span>
+        <button id="langBtn_en" onclick="setLanguage('en')" class="lang-btn active px-2.5 py-1 rounded-lg text-xs font-extrabold tracking-wide text-slate-200 hover:text-white">
+          EN • English
+        </button>
+        <button id="langBtn_vi" onclick="setLanguage('vi')" class="lang-btn px-2.5 py-1 rounded-lg text-xs font-extrabold tracking-wide text-slate-300 hover:text-white">
+          VI • Tiếng Việt
+        </button>
+        <button id="langBtn_zh" onclick="setLanguage('zh')" class="lang-btn px-2.5 py-1 rounded-lg text-xs font-extrabold tracking-wide text-slate-300 hover:text-white">
+          中文 • 简体
+        </button>
+      </div>
+
+      <button id="soundToggleBtn" onclick="toggleSound()" class="px-2.5 py-1.5 rounded-lg glass-card hover:bg-slate-700/70 text-xs font-semibold text-slate-200 flex items-center gap-1" title="Toggle Sound">
+        <span id="soundIcon">🔊</span>
+        <span id="soundLabelText" class="hidden md:inline">Sound</span>
+      </button>
+      <button id="resetCamBtn" onclick="resetCameraView()" class="px-2.5 py-1.5 rounded-lg glass-card hover:bg-slate-700/70 text-xs font-semibold text-slate-200" title="Reset 3D Camera">
+        🎥 Reset View
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT GRID -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 sm:p-4 max-w-[1600px] w-full mx-auto">
+
+    <!-- LEFT / CENTER: 3D RUBIK VIEWPORT + FLOATING CONTROLS -->
+    <section class="lg:col-span-7 flex flex-col gap-3">
+      <div class="relative flex-1 min-h-[380px] sm:min-h-[470px] rounded-2xl glass overflow-hidden flex flex-col justify-between border border-slate-700/60 shadow-2xl">
+        
+        <!-- Top Overlay Bar inside 3D Viewport -->
+        <div class="relative z-10 p-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+          <div class="pointer-events-auto flex flex-wrap items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/80">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-sky-400" id="viewportModeLabel">PAINT MODE</span>
+            <span class="text-slate-600">|</span>
+            <span class="text-xs text-slate-300" id="viewportHintText">Click any cell on the 3D cube (or 2D net) to paint. Drag empty space to rotate camera.</span>
+          </div>
+
+          <!-- Interaction toggle: Click to Paint vs Drag to Orbit -->
+          <div class="pointer-events-auto flex items-center gap-1 bg-slate-900/85 backdrop-blur-md p-1 rounded-xl border border-slate-700/80">
+            <button id="touchPaintModeBtn" onclick="setTouchInteraction('paint')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 text-white">
+              🖌️ Tap to Paint
+            </button>
+            <button id="touchOrbitModeBtn" onclick="setTouchInteraction('orbit')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white">
+              🔄 Drag to Orbit
+            </button>
+          </div>
+        </div>
+
+        <!-- Three.js Canvas Container -->
+        <div id="canvasContainer" class="absolute inset-0 w-full h-full cursor-pointer"></div>
+
+        <!-- Orientation Labels & Quick Camera Presets at Bottom of 3D Viewport -->
+        <div class="relative z-10 p-3 flex flex-wrap items-end justify-between gap-2 pointer-events-none">
+          <!-- Face Orientation Legend -->
+          <div class="pointer-events-auto bg-slate-900/85 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700/80 text-[11px] space-y-1">
+            <div class="font-bold text-slate-300 flex items-center gap-1.5">
+              <span id="legendTitleText">🧭 Fixed 6-Face Orientation:</span>
+              <span id="legendSubText" class="text-sky-400 font-normal">(Hold Front F facing you, Up U facing top)</span>
+            </div>
+            <div id="legendBadgesRow" class="flex flex-wrap gap-2 text-[11px] mono">
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200"><b>U</b>: Up</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200"><b>D</b>: Down</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200"><b>F</b>: Front</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200"><b>B</b>: Back</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200"><b>L</b>: Left</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200"><b>R</b>: Right</span>
+            </div>
+          </div>
+
+          <!-- Quick Camera View Buttons -->
+          <div class="pointer-events-auto flex flex-wrap items-center gap-1 bg-slate-900/85 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/80">
+            <span id="camViewLabel" class="text-[10px] text-slate-400 px-1.5 font-semibold">View:</span>
+            <button id="camBtnUFR" onclick="tweenCameraTo(26, 22, 34)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-sky-300">U-F-R (Front)</button>
+            <button id="camBtnDBL" onclick="tweenCameraTo(-26, -22, -34)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-amber-300">D-B-L (Back)</button>
+            <button onclick="tweenCameraTo(-28, 22, 26)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200">U-F-L</button>
+            <button onclick="tweenCameraTo(28, -22, 26)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200">D-F-R</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MANUAL ROTATION BAR (For testing physical moves on the cube anytime) -->
+      <div class="glass rounded-2xl p-3 border border-slate-800">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2">
+            <span id="manualBarTitle" class="text-xs font-bold text-slate-200">🎮 Direct 6-Face Rotation Controls:</span>
+            <span id="manualBarHint" class="text-[11px] text-slate-400">Plain = Clockwise 90° • Apostrophe <b class="text-sky-400">'</b> = Counter-Clockwise 90°</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button id="demoSexyMoveBtn" onclick="triggerRule4StepsDemo()" class="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-400/40 text-[11px] font-bold text-indigo-200 transition">
+              ⚡ Try 4-Step Trigger (R U R' U')
+            </button>
+          </div>
+        </div>
+        <div class="grid grid-cols-6 sm:grid-cols-12 gap-1.5 mono">
+          <button onclick="userMove('U')" class="py-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-xs font-bold transition">U</button>
+          <button onclick="userMove('U\'')" class="py-1.5 rounded-lg bg-slate-800/70 hover:bg-sky-600 text-xs font-bold transition">U'</button>
+          <button onclick="userMove('D')" class="py-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-xs font-bold transition">D</button>
+          <button onclick="userMove('D\'')" class="py-1.5 rounded-lg bg-slate-800/70 hover:bg-sky-600 text-xs font-bold transition">D'</button>
+          <button onclick="userMove('F')" class="py-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-xs font-bold transition">F</button>
+          <button onclick="userMove('F\'')" class="py-1.5 rounded-lg bg-slate-800/70 hover:bg-sky-600 text-xs font-bold transition">F'</button>
+          <button onclick="userMove('B')" class="py-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-xs font-bold transition">B</button>
+          <button onclick="userMove('B\'')" class="py-1.5 rounded-lg bg-slate-800/70 hover:bg-sky-600 text-xs font-bold transition">B'</button>
+          <button onclick="userMove('L')" class="py-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-xs font-bold transition">L</button>
+          <button onclick="userMove('L\'')" class="py-1.5 rounded-lg bg-slate-800/70 hover:bg-sky-600 text-xs font-bold transition">L'</button>
+          <button onclick="userMove('R')" class="py-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-xs font-bold transition">R</button>
+          <button onclick="userMove('R\'')" class="py-1.5 rounded-lg bg-slate-800/70 hover:bg-sky-600 text-xs font-bold transition">R'</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: DYNAMIC WORKSPACE (PAINT / SOLVE / CASES) -->
+    <aside class="lg:col-span-5 flex flex-col gap-3">
+
+      <!-- ==================== PANEL 1: PAINT MODE ==================== -->
+      <div id="panelPaint" class="glass rounded-2xl p-4 flex flex-col gap-3.5 border border-slate-800">
+        <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+          <div>
+            <h2 class="text-sm font-extrabold text-white flex items-center gap-2">
+              <span id="paintPanelTitle">🎨 Paint Your Real-Life Rubik's Cube</span>
+            </h2>
+            <p id="paintPanelSubtitle" class="text-[11px] text-slate-400 mt-0.5">
+              All 54 cells start gray. Pick a color below and tap on the 3D cube or 2D net.
+            </p>
+          </div>
+          <span id="paintedCounterBadge" class="mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-sky-400 border border-slate-700">
+            0 / 54 cells
+          </span>
+        </div>
+
+        <!-- Color Palette Swatches (6 Colors + Gray Eraser) -->
+        <div>
+          <div class="flex items-center justify-between text-[11px] text-slate-300 mb-2">
+            <span id="paletteLabelText" class="font-semibold">Select brush color (9 cells per color):</span>
+            <button id="autoFillBtnText" onclick="autoFillRemainingColor()" class="text-sky-400 hover:text-sky-300 font-bold underline">
+              ✨ Auto-fill remaining gray cells
+            </button>
+          </div>
+          <div id="paletteContainer" class="grid grid-cols-4 sm:grid-cols-7 gap-2"></div>
+        </div>
+
+        <!-- Quick Setup Presets for Painting -->
+        <div class="grid grid-cols-2 sm:grid-cols-2 gap-2 pt-1">
+          <button onclick="resetAllToGray()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600/80 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition">
+            <span>⬜</span>
+            <span id="btnResetGrayText">Reset All 54 to Gray</span>
+          </button>
+          <button onclick="fillStandardCentersOnly()" class="px-3 py-2 rounded-xl bg-indigo-950/80 hover:bg-indigo-900/80 border border-indigo-500/40 text-xs font-bold text-indigo-200 flex items-center justify-center gap-1.5 transition">
+            <span>🎯</span>
+            <span id="btnFillCentersText">Fill 6 Standard Centers</span>
+          </button>
+          <button onclick="loadSolvedCube()" class="px-3 py-2 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/70 border border-emerald-500/40 text-xs font-bold text-emerald-200 flex items-center justify-center gap-1.5 transition">
+            <span>✅</span>
+            <span id="btnLoadSolvedText">Load Solved Cube</span>
+          </button>
+          <button onclick="scrambleRandomValidCube()" class="px-3 py-2 rounded-xl bg-amber-950/70 hover:bg-amber-900/70 border border-amber-500/40 text-xs font-bold text-amber-200 flex items-center justify-center gap-1.5 transition">
+            <span>🎲</span>
+            <span id="btnScrambleText">Random Scramble (Test)</span>
+          </button>
+        </div>
+
+        <!-- 2D Unfolded Net (Synchronized with 3D Cube) -->
+        <div class="glass-card rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span id="net2DTitleText" class="text-xs font-bold text-slate-200">🗺️ Synchronized 2D Net (Click to paint fast):</span>
+            <span id="net2DLegendText" class="text-[11px] text-slate-400">U:Up • L:Left • F:Front • R:Right • B:Back • D:Down</span>
+          </div>
+          <div id="net2DContainer" class="flex justify-center overflow-x-auto py-1"></div>
+        </div>
+
+        <!-- Validation Diagnostic Box + Solve CTA -->
+        <div id="validationBox" class="rounded-xl p-3 bg-slate-900/90 border border-slate-700/80 text-xs space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-200" id="validationTitle">🔍 Cube Validation Status:</span>
+            <button id="autoFixBtn" onclick="autoRepairCubeState()" class="hidden px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 text-[11px] font-bold">
+              🔧 Auto-Fix Cube State
+            </button>
+          </div>
+          <p id="validationMessage" class="text-slate-300 leading-relaxed">
+            All 54 cells are currently gray. Pick colors above to match your real cube, or click "Random Scramble (Test)" to try the solver right away!
+          </p>
+        </div>
+
+        <button id="solveCtaBtn" onclick="analyzeAndSolveCube()" class="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-extrabold text-sm shadow-lg shadow-sky-600/25 transition flex items-center justify-center gap-2">
+          <span id="solveCtaBtnText">🚀 Analyze & Step-by-Step Solve Guide</span>
+        </button>
+      </div>
+
+      <!-- ==================== PANEL 2: SOLVE & STEP-BY-STEP GUIDE ==================== -->
+      <div id="panelSolve" class="glass rounded-2xl p-4 hidden flex-col gap-3.5 border border-slate-800">
+        <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+          <div>
+            <h2 id="solvePanelTitle" class="text-sm font-extrabold text-white">🧭 Step-by-Step 3D Solution Guide</h2>
+            <p id="solveSummarySubtitle" class="text-[11px] text-slate-400 mt-0.5">
+              Solving from your painted state to all 6 completed faces
+            </p>
+          </div>
+          <button id="editColorsBackBtn" onclick="setAppMode('paint')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-sky-300 border border-slate-700">
+            ✏️ Edit Colors
+          </button>
+        </div>
+
+        <!-- Current Step Spotlight Card -->
+        <div class="rounded-2xl p-3.5 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/70 border border-sky-500/30 shadow-inner space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span id="currentStageBadge" class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              Ready
+            </span>
+            <span id="stepProgressText" class="mono text-xs font-bold text-slate-300">
+              Step 0 / 0
+            </span>
+          </div>
+
+          <div class="flex items-center gap-3 py-1">
+            <div id="currentMoveBigBadge" class="w-16 h-16 rounded-2xl bg-sky-600/20 border-2 border-sky-400 flex flex-col items-center justify-center shrink-0">
+              <span id="currentMoveSymbol" class="mono text-2xl font-black text-white">—</span>
+              <span id="currentMoveDirShort" class="text-[9px] text-sky-300 font-semibold">Ready</span>
+            </div>
+            <div class="space-y-1">
+              <div id="currentMoveTitle" class="text-sm font-extrabold text-white">
+                Click "Analyze & Solve" to generate solution
+              </div>
+              <p id="currentMoveDesc" class="text-xs text-slate-300 leading-relaxed">
+                The solver verifies all 54 painted cells and breaks the solution into 7 intuitive Layer-by-Layer stages.
+              </p>
+            </div>
+          </div>
+
+          <!-- Playback Controls -->
+          <div class="grid grid-cols-5 gap-1.5 pt-1">
+            <button id="btnJumpStart" onclick="jumpToStep(0)" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition">
+              ⏮ Start
+            </button>
+            <button id="btnStepBack" onclick="stepBackward()" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition">
+              ◀ Prev
+            </button>
+            <button id="playPauseBtn" onclick="toggleAutoPlay()" class="py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-extrabold text-white transition shadow">
+              ▶ Auto Play
+            </button>
+            <button id="btnStepNext" onclick="stepForward()" class="py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs font-extrabold text-white transition shadow">
+              Next ▶
+            </button>
+            <button id="btnJumpEnd" onclick="jumpToEnd()" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition">
+              End ⏭
+            </button>
+          </div>
+
+          <!-- Speed Slider -->
+          <div class="flex items-center justify-between gap-2 pt-1 text-[11px] text-slate-400">
+            <span id="speedLabelText">Animation Speed:</span>
+            <div class="flex items-center gap-1.5">
+              <button onclick="setPlaySpeed(950)" id="spdSlow" class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">Slow</button>
+              <button onclick="setPlaySpeed(520)" id="spdMed" class="px-2 py-0.5 rounded bg-sky-600 text-white font-semibold">Medium</button>
+              <button onclick="setPlaySpeed(220)" id="spdFast" class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">Fast</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stage Breakdown Accordion / List -->
+        <div class="flex-1 flex flex-col min-h-[220px] max-h-[340px] overflow-y-auto space-y-2 pr-1" id="stagesListContainer">
+        </div>
+      </div>
+
+      <!-- ==================== PANEL 3: ALL CASES ENCYCLOPEDIA ==================== -->
+      <div id="panelCases" class="glass rounded-2xl p-4 hidden flex-col gap-3 border border-slate-800">
+        <div class="border-b border-slate-800 pb-2.5">
+          <h2 id="casesPanelTitle" class="text-sm font-extrabold text-white">📚 Complete 3x3 Rubik's Cube Cases & Algorithms</h2>
+          <p id="casesPanelSubtitle" class="text-[11px] text-slate-400 mt-0.5">
+            Covers all 7 stages from beginner to final corner orientation. Click <b>"Load to 3D & Solve"</b> on any case to practice interactively.
+          </p>
+        </div>
+
+        <div id="casesListContainer" class="flex-1 max-h-[470px] overflow-y-auto space-y-2.5 pr-1"></div>
+      </div>
+
+    </aside>
+  </main>
+
+  <script>
+    /*************************************************************************
+     * 1. MULTILINGUAL LOCALIZATION DICTIONARY (EN DEFAULT, VI, ZH)
+     *************************************************************************/
+    let currentLang = 'en'; // English is default as requested!
+
+    const FACE_ORDER = ['U', 'D', 'F', 'B', 'L', 'R'];
+
+    const I18N = {
+      en: {
+        headerSubtitle: "Paint your real-life Rubik's Cube onto the 3D gray model & get step-by-step solutions for every case",
+        tabPaint: "1. Paint Cube",
+        tabSolve: "2. 3D Solve Guide",
+        tabCases: "3. All Cases Guide",
+        sound: "Sound",
+        resetView: "🎥 Reset View",
+        statusAllGray: "54 gray cells — Ready to paint",
+        statusPainting: (n) => `Painting (${n}/54 cells)`,
+        statusValid: "54/54 cells painted — 100% Valid",
+        statusCheck: "Check painted colors",
+        modePaint: "PAINT MODE",
+        hintPaint: "Click any cell on the 3D cube (or 2D net) to paint. Drag empty space to rotate camera.",
+        modeSolve: "3D SOLVE GUIDE",
+        hintSolve: "Click 'Next ▶' or '▶ Auto Play' to watch each 3D rotation step and follow along on your cube.",
+        modeCases: "ALL CASES LIBRARY",
+        hintCases: "Select any case on the right to load its pattern onto the 3D cube and watch the animated solution.",
+        tapPaint: "🖌️ Tap to Paint",
+        dragOrbit: "🔄 Drag to Orbit",
+        legendTitle: "🧭 Fixed 6-Face Orientation:",
+        legendSub: "(Hold Front F facing you, Up U facing top)",
+        legendFaces: { U: "Up", D: "Down", F: "Front", B: "Back", L: "Left", R: "Right" },
+        centerShort: { U: "UP", D: "DOWN", F: "FRONT", B: "BACK", L: "LEFT", R: "RIGHT" },
+        faceFullNames: {
+          U: "Up Face (U)", D: "Down Face (D)", F: "Front Face (F)",
+          B: "Back Face (B)", L: "Left Face (L)", R: "Right Face (R)"
+        },
+        viewLabel: "View:",
+        camUFR: "U-F-R (Front)",
+        camDBL: "D-B-L (Back)",
+        manualBarTitle: "🎮 Direct 6-Face Rotation Controls:",
+        manualBarHint: "Plain = Clockwise 90° • Apostrophe <b class=\"text-sky-400\">'</b> = Counter-Clockwise 90°",
+        demoSexyBtn: "⚡ Try 4-Step Trigger (R U R' U')",
+        paintPanelTitle: "🎨 Paint Your Real-Life Rubik's Cube",
+        paintPanelSubtitle: "All 54 cells start gray. Pick a color below and tap on the 3D cube or 2D net.",
+        paintedCounter: (n) => `${n} / 54 cells`,
+        paletteLabel: "Select brush color (9 cells per color):",
+        autoFillBtn: "✨ Auto-fill remaining gray cells",
+        btnResetGray: "Reset All 54 to Gray",
+        btnFillCenters: "Fill 6 Standard Centers",
+        btnLoadSolved: "Load Solved Cube",
+        btnScramble: "Random Scramble (Test)",
+        net2DTitle: "🗺️ Synchronized 2D Net (Click to paint fast):",
+        net2DLegend: "U:Up • L:Left • F:Front • R:Right • B:Back • D:Down",
+        valTitleValid: "✅ Cube State is 100% Valid — Ready to Solve!",
+        valTitleIncomplete: "🖌️ Painting Your Real-Life Cube:",
+        valTitleInvalid: "⚠️ Detected Mis-painted Cell or Flipped Piece:",
+        autoFixBtn: "🔧 Auto-Fix Cube State",
+        solveCtaBtn: "🚀 Analyze & Step-by-Step Solve Guide",
+        solvePanelTitle: "🧭 Step-by-Step 3D Solution Guide",
+        editColorsBtn: "✏️ Edit Colors",
+        btnStart: "⏮ Start",
+        btnPrev: "◀ Prev",
+        btnPlay: "▶ Auto Play",
+        btnPause: "⏸ Pause",
+        btnNext: "Next ▶",
+        btnEnd: "End ⏭",
+        speedLabel: "Animation Speed:",
+        spdSlow: "Slow",
+        spdMed: "Medium",
+        spdFast: "Fast",
+        casesPanelTitle: "📚 Complete 3x3 Rubik's Cube Cases & Algorithms",
+        casesPanelSubtitle: "Covers all 7 stages from beginner to final corner orientation. Click \"Load to 3D & Solve\" on any case to practice interactively.",
+        formulaLabel: "Formula:",
+        loadCaseBtn: "▶ Load to 3D & Solve",
+        colorNames: {
+          W: "White", Y: "Yellow", R: "Red", O: "Orange", G: "Green", B: "Blue", X: "Gray"
+        },
+        cellsUnit: "cells",
+        cellLabel: "Cell",
+        valIncompleteMsg: (g) => `${g} gray cell(s) remaining. Paint all 54 cells (9 of each color) or click "Auto-fill remaining gray cells".`,
+        valColorCountMsg: (list) => `Color count mismatch (each color must have exactly 9 cells): ${list}.`,
+        valDupCentersMsg: "The 6 center cells must have 6 distinct colors. Please check your center cells!",
+        valInvalidEdgeMsg: (pos, c0, c1) => `Edge at ${pos} has an impossible color pair (${c0} - ${c1}).`,
+        valDupEdgeMsg: (c0, c1) => `Edge pair (${c0} - ${c1}) appears twice. Please check your edge stickers.`,
+        valInvalidCornerMsg: (pos, cols) => `Corner at ${pos} (${cols}) contains two opposite colors and cannot exist.`,
+        valDupCornerMsg: (cols) => `Corner piece (${cols}) appears twice.`,
+        valChiralityCornerMsg: (pos, cols) => `Corner at ${pos} (${cols}) has stickers painted in mirrored order.`,
+        valEdgeFlipMsg: "One edge is flipped in place (unsolvable without twisting/re-stickering). Click 'Auto-Fix Cube State' to fix immediately!",
+        valCornerTwistMsg: "One corner is twisted in place. Click 'Auto-Fix Cube State' to balance it automatically!",
+        valPermParityMsg: "Two pieces are swapped (permutation parity error). Click 'Auto-Fix Cube State' or check your painted colors.",
+        valValidMsg: "100% Valid Rubik's Cube! Ready to generate the step-by-step 3D solution.",
+        solveEmptySubtitle: "Complete valid colors required to solve",
+        solveEmptyBadge: "Paint all 54 cells",
+        solveEmptyTitle: "Cube is not ready to solve yet",
+        solveBtnBackPaint: "✏️ Back to Paint",
+        solveBtnScrambleNow: "🎲 Scramble & Solve Now",
+        solveAlreadyDoneSub: "Your Rubik's Cube is already completely solved!",
+        solveAlreadyDoneBadge: "100% SOLVED",
+        solveAlreadyDoneTitle: "Cube is already solved!",
+        solveAlreadyDoneDesc: "Return to the Paint tab or click 'Random Scramble' to try a new scramble.",
+        solveTotalSub: (n) => `Total ${n} moves organized into 7 clear stages`,
+        stepProgress: (cur, tot) => `Step ${cur} / ${tot}`,
+        prepStagePrefix: (stName) => `Ready • ${stName}`,
+        nextShortPrefix: (sh) => `Next: ${sh}`,
+        step1NextTitle: (t) => `Step 1 Next: ${t}`,
+        holdOrientationNote: (fCol, uCol) => `(Hold Front F with ${fCol} center facing you, Up U with ${uCol} center on top).`,
+        allSolvedBadge: "🎉 ALL 6 FACES SOLVED!",
+        allSolvedShort: "Done",
+        allSolvedTitle: "Congratulations! All 6 faces are completely solved!",
+        allSolvedDesc: "Click any move chip below to review that step, or press '⏮ Start' to replay from the beginning.",
+        executedStepTitle: (idx, t) => `Completed Step ${idx}: ${t}`,
+        nextStepInline: (idx, m, sh) => `Next step (${idx}): ${m} (${sh}).`,
+        stageAlreadyDone: "Already solved (0 moves)",
+        movesCountUnit: (n) => `${n} moves`,
+        stageMeta: (cDName, cUName) => ({
+          1: {
+            name: `Stage 1: Bottom Cross (${cDName})`,
+            tip: `Bring the 4 ${cDName} edges to the Down (D) face so their side stickers match the Front, Right, Back, and Left centers.`
+          },
+          2: {
+            name: `Stage 2: First Layer Corners (4-Step Trigger R U R' U')`,
+            tip: `Place each corner above its target slot and repeat the 4-step trigger (R U R' U') 1 to 5 times until it locks into place.`
+          },
+          3: {
+            name: `Stage 3: Middle Layer Edges (Second Layer)`,
+            tip: `Rotate U to form a vertical T on a side face, then use the Right insert (U R U' R' U' F' U F) or Left insert algorithm.`
+          },
+          4: {
+            name: `Stage 4: Top Cross Orientation (${cUName})`,
+            tip: `Use F (R U R' U') F' to progress from Dot -> L-shape (hold at 9 & 12 o'clock) -> Horizontal Line -> Top Cross.`
+          },
+          5: {
+            name: `Stage 5: Align Top Edges with Side Centers`,
+            tip: `Rotate U to match 2 adjacent edges (hold at Back & Right), then apply the Sune algorithm: R U R' U R U2 R' U.`
+          },
+          6: {
+            name: `Stage 6: Position All 4 Top Corners`,
+            tip: `Find 1 corner in its correct slot (hold at Front-Right), then cycle the other 3 corners with Niklas: U R U' L' U R' U' L.`
+          },
+          7: {
+            name: `Stage 7: Orient Top Corners to Finish Cube (R' D' R D)`,
+            tip: `Keep Front (F) fixed! Repeat (R' D' R D) until the Front-Right corner shows ${cUName} on top, then turn U ONLY to bring the next corner over!`
+          }
+        })
+      },
+      vi: {
+        headerSubtitle: "Tô màu khối Rubik ngoài đời của bạn lên mô hình 3D xám & nhận hướng dẫn giải từng bước cho mọi trường hợp",
+        tabPaint: "1. Tô Màu Rubik",
+        tabSolve: "2. Giải & Hướng Dẫn 3D",
+        tabCases: "3. Cẩm Nang Mọi Trường Hợp",
+        sound: "Âm thanh",
+        resetView: "🎥 Góc nhìn chuẩn",
+        statusAllGray: "54 ô xám — Sẵn sàng tô màu",
+        statusPainting: (n) => `Đang tô màu (${n}/54 ô)`,
+        statusValid: "Đã tô đủ 54/54 ô — Hợp lệ 100%",
+        statusCheck: "Cần kiểm tra lại ô màu",
+        modePaint: "CHẾ ĐỘ TÔ MÀU",
+        hintPaint: "Nhấn vào từng ô trên khối 3D (hoặc lưới 2D) để tô màu. Kéo chuột vùng trống để xoay góc nhìn.",
+        modeSolve: "HƯỚNG DẪN GIẢI 3D",
+        hintSolve: "Bấm 'Tiếp 1 ▶' hoặc '▶ Tự chạy' để xem khối 3D xoay từng bước và làm theo trên Rubik thật.",
+        modeCases: "CẨM NANG MỌI TRƯỜNG HỢP",
+        hintCases: "Chọn bất kỳ trường hợp nào bên phải để nạp thế cờ lên khối 3D và xem hướng dẫn giải trực tiếp.",
+        tapPaint: "🖌️ Chạm để tô",
+        dragOrbit: "🔄 Chạm để xoay 3D",
+        legendTitle: "🧭 Quy ước 6 mặt cố định:",
+        legendSub: "(Giữ mặt Trước F hướng về bạn, Trên U hướng lên)",
+        legendFaces: { U: "Trên", D: "Dưới", F: "Trước", B: "Sau", L: "Trái", R: "Phải" },
+        centerShort: { U: "TRÊN", D: "DƯỚI", F: "TRƯỚC", B: "SAU", L: "TRÁI", R: "PHẢI" },
+        faceFullNames: {
+          U: "Mặt Trên (U)", D: "Mặt Dưới (D)", F: "Mặt Trước (F)",
+          B: "Mặt Sau (B)", L: "Mặt Trái (L)", R: "Mặt Phải (R)"
+        },
+        viewLabel: "Xem mặt:",
+        camUFR: "U-F-R (Trước)",
+        camDBL: "D-B-L (Sau/Đáy)",
+        manualBarTitle: "🎮 Bàn xoay 6 mặt trực tiếp (Thử xoay khối 3D):",
+        manualBarHint: "Chữ thường = cùng chiều kim đồng hồ • Dấu <b class=\"text-sky-400\">'</b> = ngược chiều kim đồng hồ",
+        demoSexyBtn: "⚡ Thử tổ hợp \"Lên - Sang - Xuống - Về\" (R U R' U')",
+        paintPanelTitle: "🎨 Bảng Tô Màu Khối Rubik Thực Tế",
+        paintPanelSubtitle: "Mặc định 54 ô đều màu xám. Chọn màu bên dưới rồi chấm lên khối 3D hoặc sơ đồ trải phẳng 2D.",
+        paintedCounter: (n) => `${n} / 54 ô đã tô`,
+        paletteLabel: "Chọn màu cọ tô (Mỗi màu chuẩn có đúng 9 ô):",
+        autoFillBtn: "✨ Tự điền các ô xám còn thiếu",
+        btnResetGray: "Xóa về 54 ô Xám (Mặc định)",
+        btnFillCenters: "Tô sẵn 6 ô Tâm chuẩn",
+        btnLoadSolved: "Nạp Rubik đã hoàn thiện",
+        btnScramble: "Trộn ngẫu nhiên (Test giải)",
+        net2DTitle: "🗺️ Lưới 2D 6 mặt đồng bộ (Nhấn vào ô để tô nhanh):",
+        net2DLegend: "U:Trên • L:Trái • F:Trước • R:Phải • B:Sau • D:Dưới",
+        valTitleValid: "✅ Khối Rubik hợp lệ 100% — Có thể giải ngay!",
+        valTitleIncomplete: "🖌️ Đang tô màu khối Rubik ngoài đời của bạn:",
+        valTitleInvalid: "⚠️ Phát hiện ô tô nhầm hoặc viên Rubik bị lắp ngược:",
+        autoFixBtn: "🔧 Tự động cân chỉnh thành Rubik hợp lệ",
+        solveCtaBtn: "🚀 Phân Tích & Hướng Dẫn Giải Từng Bước",
+        solvePanelTitle: "🧭 Hướng Dẫn Giải Chi Tiết Từng Bước",
+        editColorsBtn: "✏️ Sửa lại màu",
+        btnStart: "⏮ Đầu",
+        btnPrev: "◀ Lùi 1",
+        btnPlay: "▶ Tự chạy",
+        btnPause: "⏸ Tạm dừng",
+        btnNext: "Tiếp 1 ▶",
+        btnEnd: "Cuối ⏭",
+        speedLabel: "Tốc độ xoay hướng dẫn:",
+        spdSlow: "Chậm (Dễ nhìn)",
+        spdMed: "Vừa",
+        spdFast: "Nhanh",
+        casesPanelTitle: "📚 Cẩm Nang Giải Mọi Trường Hợp Rubik 3x3",
+        casesPanelSubtitle: "Tổng hợp đầy đủ 7 giai đoạn từ cơ bản đến hoàn thiện kèm nút \"Nạp lên 3D & Giải mẫu\" để bạn xem trực tiếp từng trường hợp.",
+        formulaLabel: "Công thức:",
+        loadCaseBtn: "▶ Nạp lên 3D & Giải mẫu",
+        colorNames: {
+          W: "Trắng", Y: "Vàng", R: "Đỏ", O: "Cam", G: "Xanh lá", B: "Xanh dương", X: "Xám (Xóa)"
+        },
+        cellsUnit: "ô",
+        cellLabel: "Ô",
+        valIncompleteMsg: (g) => `Còn ${g} ô màu xám chưa được tô. Hãy tô đủ 54 ô (mỗi màu đúng 9 ô) hoặc bấm "Tự điền các ô xám còn thiếu".`,
+        valColorCountMsg: (list) => `Số lượng ô màu chưa chuẩn (mỗi màu phải có đúng 9 ô): ${list}.`,
+        valDupCentersMsg: "6 ô tâm ở chính giữa 6 mặt phải có 6 màu khác nhau hoàn toàn. Hãy kiểm tra lại các ô tâm!",
+        valInvalidEdgeMsg: (pos, c0, c1) => `Viên cạnh tại vị trí ${pos} có cặp màu (${c0} - ${c1}) không thể tồn tại trên cùng 1 viên cạnh.`,
+        valDupEdgeMsg: (c0, c1) => `Cặp màu cạnh (${c0} - ${c1}) bị lặp lại 2 lần. Hãy kiểm tra lại các viên cạnh.`,
+        valInvalidCornerMsg: (pos, cols) => `Viên góc tại ${pos} (${cols}) chứa 2 màu đối diện nhau nên không hợp lệ.`,
+        valDupCornerMsg: (cols) => `Viên góc (${cols}) bị lặp lại 2 lần.`,
+        valChiralityCornerMsg: (pos, cols) => `Viên góc tại vị trí ${pos} (${cols}) bị tô ngược chiều kim đồng hồ giữa 2 mặt kề nhau.`,
+        valEdgeFlipMsg: "Khối Rubik có 1 viên cạnh bị lật ngược đơn lẻ. Bạn có thể bấm nút 'Tự động cân chỉnh' để sửa nhanh!",
+        valCornerTwistMsg: "Khối Rubik có 1 viên góc bị xoắn tại chỗ. Bạn có thể bấm nút 'Tự động cân chỉnh' để sửa nhanh!",
+        valPermParityMsg: "Khối Rubik bị tráo đổi 2 viên đơn lẻ (lỗi chẵn lẻ hoán vị). Hãy bấm 'Tự động cân chỉnh' hoặc kiểm tra lại màu vừa tô.",
+        valValidMsg: "Khối Rubik hợp lệ 100%! Sẵn sàng phân tích và hướng dẫn giải chi tiết từng bước.",
+        solveEmptySubtitle: "Chưa đủ dữ liệu màu hợp lệ để giải",
+        solveEmptyBadge: "Cần tô đủ 54 ô màu",
+        solveEmptyTitle: "Khối Rubik chưa sẵn sàng để giải",
+        solveBtnBackPaint: "✏️ Quay lại Tô Màu",
+        solveBtnScrambleNow: "🎲 Trộn mẫu & Giải thử ngay",
+        solveAlreadyDoneSub: "Khối Rubik của bạn đã ở trạng thái hoàn chỉnh 6 mặt!",
+        solveAlreadyDoneBadge: "ĐÃ HOÀN THÀNH 100%",
+        solveAlreadyDoneTitle: "Khối Rubik đã được giải xong!",
+        solveAlreadyDoneDesc: "Bạn có thể quay lại tab Tô Màu hoặc bấm 'Trộn ngẫu nhiên' để thử một trường hợp mới.",
+        solveTotalSub: (n) => `Tổng cộng ${n} bước chia làm 7 giai đoạn rõ ràng`,
+        stepProgress: (cur, tot) => `Bước ${cur} / ${tot}`,
+        prepStagePrefix: (stName) => `Chuẩn bị • ${stName}`,
+        nextShortPrefix: (sh) => `Sắp tới: ${sh}`,
+        step1NextTitle: (t) => `Bước 1 tiếp theo: ${t}`,
+        holdOrientationNote: (fCol, uCol) => `(Giữ mặt Trước F màu ${fCol} hướng về bạn, mặt Trên U màu ${uCol} hướng lên).`,
+        allSolvedBadge: "🎉 ĐÃ GIẢI XONG 6 MẶT!",
+        allSolvedShort: "Hoàn thành",
+        allSolvedTitle: "Chúc mừng! Khối Rubik đã về 6 mặt hoàn chỉnh!",
+        allSolvedDesc: "Bạn có thể bấm vào bất kỳ bước nào bên dưới để xem lại, hoặc bấm '⏮ Đầu' để chạy lại từ đầu.",
+        executedStepTitle: (idx, t) => `Đã thực hiện Bước ${idx}: ${t}`,
+        nextStepInline: (idx, m, sh) => `Bước tiếp theo (${idx}): ${m} (${sh}).`,
+        stageAlreadyDone: "Đã hoàn thành sẵn (0 bước)",
+        movesCountUnit: (n) => `${n} bước`,
+        stageMeta: (cDName, cUName) => ({
+          1: {
+            name: `Giai đoạn 1: Tạo Dấu Cộng Mặt Đáy (${cDName})`,
+            tip: `Đưa 4 viên cạnh màu ${cDName} về mặt Dưới (D) sao cho màu bên hông khớp đúng với 4 tâm Trước - Phải - Sau - Trái.`
+          },
+          2: {
+            name: `Giai đoạn 2: Hoàn Thiện 4 Góc Tầng 1 (Quy tắc Lên - Sang - Xuống - Về)`,
+            tip: `Đặt viên góc ngay phía trên vị trí cần vào rồi lặp lại tổ hợp 4 bước "Lên - Sang - Xuống - Về" (R U R' U') từ 1 đến 5 lần là viên góc tự khắc vào đúng chỗ.`
+          },
+          3: {
+            name: `Giai đoạn 3: Hoàn Thiện 4 Viên Cạnh Tầng Giữa (Tầng 2)`,
+            tip: `Xoay tầng Trên (U) tạo hình chữ T dọc với tâm mặt bên, sau đó dùng công thức đưa cạnh sang Phải (U R U' R' U' F' U F) hoặc sang Trái.`
+          },
+          4: {
+            name: `Giai đoạn 4: Tạo Dấu Cộng Mặt Trên (${cUName})`,
+            tip: `Dùng công thức F (R U R' U') F' (Gập mặt trước -> Lên Sang Xuống Về -> Trả mặt trước) để biến Chấm tròn -> Chữ L (đặt góc 9h-12h) -> Đường ngang -> Dấu cộng.`
+          },
+          5: {
+            name: `Giai đoạn 5: Khớp Màu 4 Cạnh Mặt Trên Với Tâm Bên`,
+            tip: `Xoay U để tìm 2 cạnh đúng màu nằm kề nhau (đặt ở mặt Sau và mặt Phải), rồi áp dụng công thức Sune: R U R' U R U2 R' U.`
+          },
+          6: {
+            name: `Giai đoạn 6: Đưa 4 Góc Mặt Trên Về Đúng Vị Trí`,
+            tip: `Tìm 1 viên góc đã nằm đúng vị trí (dù chưa lật đúng chiều màu), giữ nó bên phải rồi dùng công thức hoán vị 3 góc còn lại: U R U' L' U R' U' L.`
+          },
+          7: {
+            name: `Giai đoạn 7: Xoay Lật Góc Hoàn Thiện 6 Mặt (Quy tắc R' D' R D)`,
+            tip: `Giữ cố định mặt Trước (F), lặp lại 4 bước (R' D' R D) cho đến khi góc Phải-Trên lật màu ${cUName} lên mặt Trên, sau đó chỉ xoay mặt U để đưa góc tiếp theo tới vị trí Phải-Trên!`
+          }
+        })
+      },
+      zh: {
+        headerSubtitle: "将您现实中的魔方颜色涂在3D灰色模型上，获取全情况分步还原教程",
+        tabPaint: "1. 魔方涂色",
+        tabSolve: "2. 3D 还原教程",
+        tabCases: "3. 全情况公式库",
+        sound: "音效",
+        resetView: "🎥 重置视角",
+        statusAllGray: "54格全灰 — 准备涂色",
+        statusPainting: (n) => `正在涂色 (${n}/54 格)`,
+        statusValid: "已涂满 54/54 格 — 100% 有效",
+        statusCheck: "请检查所涂颜色",
+        modePaint: "涂色模式",
+        hintPaint: "点击3D魔方或右侧2D展开图上的任意色块进行涂色，拖动空白处旋转3D视角。",
+        modeSolve: "3D 分步还原向导",
+        hintSolve: "点击“下一步 ▶”或“▶ 自动播放”观看3D旋转演示，并同步转动您手中的真魔方。",
+        modeCases: "全情况公式图鉴",
+        hintCases: "点击右侧任意情况即可将该状态加载到3D魔方上，并直接演示分步解法。",
+        tapPaint: "🖌️ 点击涂色",
+        dragOrbit: "🔄 拖动旋转3D",
+        legendTitle: "🧭 6面固定方向约定：",
+        legendSub: "(保持前面 F 朝向自己，顶面 U 朝上)",
+        legendFaces: { U: "顶面", D: "底面", F: "前面", B: "后面", L: "左面", R: "右面" },
+        centerShort: { U: "顶U", D: "底D", F: "前F", B: "后B", L: "左L", R: "右R" },
+        faceFullNames: {
+          U: "顶面 (U)", D: "底面 (D)", F: "前面 (F)",
+          B: "后面 (B)", L: "左面 (L)", R: "右面 (R)"
+        },
+        viewLabel: "视角：",
+        camUFR: "U-F-R (前视)",
+        camDBL: "D-B-L (后底)",
+        manualBarTitle: "🎮 6面直接旋转控制台 (自由测试旋转)：",
+        manualBarHint: "普通字母 = 顺时针 90° • 带撇号 <b class=\"text-sky-400\">'</b> = 逆时针 90°",
+        demoSexyBtn: "⚡ 演示“上-左-下-右”四步法 (R U R' U')",
+        paintPanelTitle: "🎨 涂色还原您的真实魔方",
+        paintPanelSubtitle: "默认54格全为灰色。在下方选择画笔颜色，然后点击3D魔方或2D展开图涂色。",
+        paintedCounter: (n) => `已涂 ${n} / 54 格`,
+        paletteLabel: "选择画笔颜色（标准魔方每种颜色各9格）：",
+        autoFillBtn: "✨ 自动填充剩余灰色格",
+        btnResetGray: "重置为54格全灰",
+        btnFillCenters: "填入6个标准中心块",
+        btnLoadSolved: "加载已还原魔方",
+        btnScramble: "随机打乱 (测试解法)",
+        net2DTitle: "🗺️ 同步2D六面展开图 (点击快速涂色)：",
+        net2DLegend: "U:顶 • L:左 • F:前 • R:右 • B:后 • D:底",
+        valTitleValid: "✅ 魔方状态 100% 合法 — 可以立即求解！",
+        valTitleIncomplete: "🖌️ 正在录入您的魔方颜色：",
+        valTitleInvalid: "⚠️ 检测到涂色错误或物理装反的块：",
+        autoFixBtn: "🔧 自动修正为合法魔方状态",
+        solveCtaBtn: "🚀 分析状态并生成分步还原教程",
+        solvePanelTitle: "🧭 3D 分步还原详细指南",
+        editColorsBtn: "✏️ 修改颜色",
+        btnStart: "⏮ 开头",
+        btnPrev: "◀ 上一步",
+        btnPlay: "▶ 自动播放",
+        btnPause: "⏸ 暂停",
+        btnNext: "下一步 ▶",
+        btnEnd: "末尾 ⏭",
+        speedLabel: "动画旋转速度：",
+        spdSlow: "慢速 (易跟做)",
+        spdMed: "中速",
+        spdFast: "快速",
+        casesPanelTitle: "📚 三阶魔方全情况公式库 (7阶段全覆盖)",
+        casesPanelSubtitle: "涵盖从底层十字到顶层角块归位的全部典型情况，点击“加载到3D并演示”即可直观学习。",
+        formulaLabel: "公式：",
+        loadCaseBtn: "▶ 加载到3D并演示",
+        colorNames: {
+          W: "白色", Y: "黄色", R: "红色", O: "橙色", G: "绿色", B: "蓝色", X: "灰色(擦除)"
+        },
+        cellsUnit: "格",
+        cellLabel: "格",
+        valIncompleteMsg: (g) => `还有 ${g} 个灰色色块未涂色。请涂满54格（每种颜色9格）或点击“自动填充剩余灰色格”。`,
+        valColorCountMsg: (list) => `各颜色数量不正确（每种颜色必须恰好9格）：${list}。`,
+        valDupCentersMsg: "6个面的中心块必须是6种完全不同的颜色，请检查中心块！",
+        valInvalidEdgeMsg: (pos, c0, c1) => `位置 ${pos} 的棱块包含不可能同处一棱的颜色组合 (${c0} - ${c1})。`,
+        valDupEdgeMsg: (c0, c1) => `棱块 (${c0} - ${c1}) 重复出现了2次，请检查棱块颜色。`,
+        valInvalidCornerMsg: (pos, cols) => `位置 ${pos} 的角块 (${cols}) 含有相对面的颜色，不可能存在。`,
+        valDupCornerMsg: (cols) => `角块 (${cols}) 重复出现了2次。`,
+        valChiralityCornerMsg: (pos, cols) => `位置 ${pos} 的角块 (${cols}) 相邻面颜色顺序涂反。`,
+        valEdgeFlipMsg: "检测到单个棱块原地翻转（未拆装无法拧出）。点击“自动修正”即可一键修复！",
+        valCornerTwistMsg: "检测到单个角块原地扭转。点击“自动修正”即可一键修复！",
+        valPermParityMsg: "检测到两个块单独互换（奇偶校验错误）。请点击“自动修正”或检查刚涂的颜色。",
+        valValidMsg: "魔方状态 100% 合法！随时可以开始分步还原。",
+        solveEmptySubtitle: "需要完整且合法的54格颜色才能求解",
+        solveEmptyBadge: "请先涂满54格",
+        solveEmptyTitle: "魔方尚未准备好求解",
+        solveBtnBackPaint: "✏️ 返回涂色",
+        solveBtnScrambleNow: "🎲 随机打乱并立即演示",
+        solveAlreadyDoneSub: "您的魔方已经是6面完全还原状态！",
+        solveAlreadyDoneBadge: "100% 已还原",
+        solveAlreadyDoneTitle: "魔方已完成还原！",
+        solveAlreadyDoneDesc: "您可以返回涂色面板，或点击“随机打乱”测试新的状态。",
+        solveTotalSub: (n) => `共 ${n} 步，清晰分为 7 个阶段`,
+        stepProgress: (cur, tot) => `第 ${cur} / ${tot} 步`,
+        prepStagePrefix: (stName) => `准备 • ${stName}`,
+        nextShortPrefix: (sh) => `即将执行: ${sh}`,
+        step1NextTitle: (t) => `第 1 步：${t}`,
+        holdOrientationNote: (fCol, uCol) => `（请保持 ${fCol}中心块朝前 F，${uCol}中心块朝上 U）。`,
+        allSolvedBadge: "🎉 6面已全部还原！",
+        allSolvedShort: "完成",
+        allSolvedTitle: "恭喜！魔方六个面已完全复原！",
+        allSolvedDesc: "您可以点击下方任意步骤按钮回看，或点击“⏮ 开头”重新播放。",
+        executedStepTitle: (idx, t) => `已完成第 ${idx} 步：${t}`,
+        nextStepInline: (idx, m, sh) => `下一步 (${idx})：${m} (${sh})。`,
+        stageAlreadyDone: "该阶段已完成 (0 步)",
+        movesCountUnit: (n) => `${n} 步`,
+        stageMeta: (cDName, cUName) => ({
+          1: {
+            name: `第1阶段：底层十字 (${cDName})`,
+            tip: `将4个带有${cDName}的棱块归位到底面(D)，并使侧面颜色与前、右、后、左四个中心块对齐。`
+          },
+          2: {
+            name: `第2阶段：底层4个角块（“上-左-下-右”四步法）`,
+            tip: `将目标角块移到对应位置正上方，重复执行 R U R' U'（上-左-下-右）1至5次即可归位。`
+          },
+          3: {
+            name: `第3阶段：中层4个棱块（第二层）`,
+            tip: `转动顶层(U)使棱块侧面与中心块连成竖直T字，再用右手公式 (U R U' R' U' F' U F) 或左手公式归位。`
+          },
+          4: {
+            name: `第4阶段：顶层十字 (${cUName})`,
+            tip: `使用公式 F (R U R' U') F' 依次将顶面从“单点” -> “小拐角L形（放左上9点-12点）” -> “横线” -> “顶层十字”。`
+          },
+          5: {
+            name: `第5阶段：顶层棱块侧面颜色对齐`,
+            tip: `转动U找到2个已对齐的相邻棱块（放在后面和右面），执行小鱼公式 Sune：R U R' U R U2 R' U。`
+          },
+          6: {
+            name: `第6阶段：顶层4个角块位置归位`,
+            tip: `找到1个位置正确的角块（放在右前角UFR），执行角块轮换公式 Niklas：U R U' L' U R' U' L。`
+          },
+          7: {
+            name: `第7阶段：顶层角块翻色完成六面 (R' D' R D)`,
+            tip: `保持前面(F)朝向绝对不变！重复 (R' D' R D) 直到右前角顶面变为${cUName}，然后只转顶层 U 换下一个角块继续！`
+          }
+        })
+      }
+    };
+
+    const PALETTE = [
+      { code: 'W', hex: '#F8FAFC', textHex: '#0F172A', stdFace: 'U' },
+      { code: 'Y', hex: '#FACC15', textHex: '#0F172A', stdFace: 'D' },
+      { code: 'R', hex: '#EF4444', textHex: '#FFFFFF', stdFace: 'F' },
+      { code: 'O', hex: '#F97316', textHex: '#FFFFFF', stdFace: 'B' },
+      { code: 'G', hex: '#22C55E', textHex: '#0F172A', stdFace: 'L' },
+      { code: 'B', hex: '#3B82F6', textHex: '#FFFFFF', stdFace: 'R' },
+      { code: 'X', hex: '#64748B', textHex: '#F8FAFC', stdFace: null }
+    ];
+
+    const COLOR_MAP = {};
+    PALETTE.forEach(p => { COLOR_MAP[p.code] = p; });
+    function getColorName(code) {
+      return I18N[currentLang].colorNames[code] || code;
+    }
+
+    // Multilingual Move Explanations
+    const MOVE_EXPLANATIONS_I18N = {
+      en: {
+        "U":  { title: "Turn Up Face (U) Clockwise", short: "Up ↻", desc: "Hold the cube steady and push the top layer (U) 90° clockwise (from right to left)." },
+        "U'": { title: "Turn Up Face (U') Counter-Clockwise", short: "Up ↺", desc: "Push the top layer (U) 90° counter-clockwise (from left to right)." },
+        "U2": { title: "Turn Up Face (U2) 180° (Twice)", short: "Up 180°", desc: "Rotate the top layer (U) 180 degrees." },
+        "D":  { title: "Turn Down Face (D) Clockwise", short: "Down ↻", desc: "Push the bottom layer (D) 90° from left to right (clockwise looking from the bottom)." },
+        "D'": { title: "Turn Down Face (D') Counter-Clockwise", short: "Down ↺", desc: "Push the bottom layer (D) 90° from right to left." },
+        "D2": { title: "Turn Down Face (D2) 180°", short: "Down 180°", desc: "Rotate the bottom layer (D) 180 degrees." },
+        "R":  { title: "Turn Right Face (R) UP", short: "Right ↑", desc: "Push the right column (R) 90° UPWARD ('Up' step in the 4-step trigger R U R' U')." },
+        "R'": { title: "Turn Right Face (R') DOWN", short: "Right ↓", desc: "Pull the right column (R) 90° DOWNWARD ('Down' step in R U R' U')." },
+        "R2": { title: "Turn Right Face (R2) 180°", short: "Right 180°", desc: "Rotate the right face (R) 180 degrees." },
+        "L":  { title: "Turn Left Face (L) DOWN", short: "Left ↓", desc: "Pull the left column (L) 90° DOWNWARD (clockwise looking at the Left face)." },
+        "L'": { title: "Turn Left Face (L') UP", short: "Left ↑", desc: "Push the left column (L) 90° UPWARD (counter-clockwise looking at the Left face)." },
+        "L2": { title: "Turn Left Face (L2) 180°", short: "Left 180°", desc: "Rotate the left face (L) 180 degrees." },
+        "F":  { title: "Turn Front Face (F) Clockwise", short: "Front ↻", desc: "Looking directly at the Front face (F), turn it 90° clockwise (to the right)." },
+        "F'": { title: "Turn Front Face (F') Counter-Clockwise", short: "Front ↺", desc: "Looking directly at the Front face (F), turn it 90° counter-clockwise (to the left)." },
+        "F2": { title: "Turn Front Face (F2) 180°", short: "Front 180°", desc: "Rotate the Front face (F) 180 degrees." },
+        "B":  { title: "Turn Back Face (B) Clockwise", short: "Back ↻", desc: "Rotate the Back layer (B) 90° clockwise (viewed from the back, top tilts left)." },
+        "B'": { title: "Turn Back Face (B') Counter-Clockwise", short: "Back ↺", desc: "Rotate the Back layer (B) 90° counter-clockwise (top tilts right)." },
+        "B2": { title: "Turn Back Face (B2) 180°", short: "Back 180°", desc: "Rotate the Back face (B) 180 degrees." }
+      },
+      vi: {
+        "U":  { title: "Xoay Mặt Trên (U) qua trái", short: "Trên ↻", desc: "Giữ khối Rubik cố định, dùng ngón trỏ phải đẩy tầng Trên cùng (U) xoay 90° theo chiều kim đồng hồ (từ phải sang trái)." },
+        "U'": { title: "Xoay Mặt Trên (U') qua phải", short: "Trên ↺", desc: "Dùng ngón trỏ trái đẩy tầng Trên cùng (U) xoay 90° ngược chiều kim đồng hồ (từ trái sang phải)." },
+        "U2": { title: "Xoay Mặt Trên (U2) 2 lần (180°)", short: "Trên 180°", desc: "Xoay tầng Trên cùng (U) 2 nấc (180°)." },
+        "D":  { title: "Xoay Mặt Dưới (D) qua phải", short: "Dưới ↻", desc: "Dùng ngón áp út trái đẩy tầng Đáy dưới cùng (D) xoay 90° từ trái sang phải (theo chiều kim đồng hồ khi nhìn từ đáy)." },
+        "D'": { title: "Xoay Mặt Dưới (D') qua trái", short: "Dưới ↺", desc: "Dùng ngón áp út phải đẩy tầng Đáy dưới cùng (D) xoay 90° từ phải sang trái." },
+        "D2": { title: "Xoay Mặt Dưới (D2) 2 lần (180°)", short: "Dưới 180°", desc: "Xoay tầng Đáy dưới cùng (D) 2 nấc (180°)." },
+        "R":  { title: "Xoay Mặt Phải (R) LÊN", short: "Phải ↑", desc: "Xoay cột bên Phải (R) đẩy LÊN trên 90° (bước 'Lên' trong quy tắc Lên - Sang - Xuống - Về)." },
+        "R'": { title: "Xoay Mặt Phải (R') XUỐNG", short: "Phải ↓", desc: "Xoay cột bên Phải (R) kéo XUỐNG dưới 90° (bước 'Xuống' trong quy tắc Lên - Sang - Xuống - Về)." },
+        "R2": { title: "Xoay Mặt Phải (R2) 2 lần (180°)", short: "Phải 180°", desc: "Xoay cột bên Phải (R) 2 nấc (180°)." },
+        "L":  { title: "Xoay Mặt Trái (L) XUỐNG", short: "Trái ↓", desc: "Xoay cột bên Trái (L) kéo XUỐNG dưới 90° (theo chiều kim đồng hồ khi nhìn vào mặt trái)." },
+        "L'": { title: "Xoay Mặt Trái (L') LÊN", short: "Trái ↑", desc: "Xoay cột bên Trái (L) đẩy LÊN trên 90° (ngược chiều kim đồng hồ khi nhìn vào mặt trái)." },
+        "L2": { title: "Xoay Mặt Trái (L2) 2 lần (180°)", short: "Trái 180°", desc: "Xoay cột bên Trái (L) 2 nấc (180°)." },
+        "F":  { title: "Xoay Mặt Trước (F) cùng chiều kim đồng hồ", short: "Trước ↻", desc: "Nhìn thẳng vào mặt Trước (F), xoay mặt Trước 90° theo chiều kim đồng hồ (sang phải)." },
+        "F'": { title: "Xoay Mặt Trước (F') ngược chiều kim đồng hồ", short: "Trước ↺", desc: "Nhìn thẳng vào mặt Trước (F), xoay mặt Trước 90° ngược chiều kim đồng hồ (sang trái)." },
+        "F2": { title: "Xoay Mặt Trước (F2) 2 lần (180°)", short: "Trước 180°", desc: "Xoay mặt Trước (F) 2 nấc (180°)." },
+        "B":  { title: "Xoay Mặt Sau (B) cùng chiều kim đồng hồ", short: "Sau ↻", desc: "Xoay tầng Mặt Sau lưng (B) 90° theo chiều kim đồng hồ (khi nhìn từ phía sau, tức đỉnh nghiêng sang trái)." },
+        "B'": { title: "Xoay Mặt Sau (B') ngược chiều kim đồng hồ", short: "Sau ↺", desc: "Xoay tầng Mặt Sau lưng (B) 90° ngược chiều kim đồng hồ (đỉnh nghiêng sang phải)." },
+        "B2": { title: "Xoay Mặt Sau (B2) 2 lần (180°)", short: "Sau 180°", desc: "Xoay tầng Mặt Sau lưng (B) 2 nấc (180°)." }
+      },
+      zh: {
+        "U":  { title: "顶层 (U) 顺时针向左拨", short: "顶层 ↻", desc: "拿稳魔方，用右手食指将顶层 (U) 顺时针拨动 90°（从右向左）。" },
+        "U'": { title: "顶层 (U') 逆时针向右拨", short: "顶层 ↺", desc: "用左手食指将顶层 (U) 逆时针拨动 90°（从左向右）。" },
+        "U2": { title: "顶层 (U2) 旋转 180°", short: "顶层 180°", desc: "将顶层 (U) 连续转动两下（180°）。" },
+        "D":  { title: "底层 (D) 顺时针向右拨", short: "底层 ↻", desc: "将底层 (D) 从左向右拨动 90°（从底面看为顺时针）。" },
+        "D'": { title: "底层 (D') 逆时针向左拨", short: "底层 ↺", desc: "将底层 (D) 从右向左拨动 90°。" },
+        "D2": { title: "底层 (D2) 旋转 180°", short: "底层 180°", desc: "将底层 (D) 连续转动两下（180°）。" },
+        "R":  { title: "右层 (R) 向上推", short: "右层 ↑", desc: "将右侧列 (R) 向上推转 90°（对应“上左下右”中的“上”）。" },
+        "R'": { title: "右层 (R') 向下拉", short: "右层 ↓", desc: "将右侧列 (R) 向下拉转 90°（对应“上左下右”中的“下”）。" },
+        "R2": { title: "右层 (R2) 旋转 180°", short: "右层 180°", desc: "将右侧面 (R) 旋转 180°。" },
+        "L":  { title: "左层 (L) 向下拉", short: "左层 ↓", desc: "将左侧列 (L) 向下拉转 90°（正视左面为顺时针）。" },
+        "L'": { title: "左层 (L') 向上推", short: "左层 ↑", desc: "将左侧列 (L) 向上推转 90°（正视左面为逆时针）。" },
+        "L2": { title: "左层 (L2) 旋转 180°", short: "左层 180°", desc: "将左侧面 (L) 旋转 180°。" },
+        "F":  { title: "前面 (F) 顺时针旋转", short: "前面 ↻", desc: "正视前面 (F)，将其顺时针（向右）旋转 90°。" },
+        "F'": { title: "前面 (F') 逆时针旋转", short: "前面 ↺", desc: "正视前面 (F)，将其逆时针（向左）旋转 90°。" },
+        "F2": { title: "前面 (F2) 旋转 180°", short: "前面 180°", desc: "将前面 (F) 旋转 180°。" },
+        "B":  { title: "后面 (B) 顺时针旋转", short: "后面 ↻", desc: "将后层 (B) 顺时针旋转 90°（正视背面时顺时针，即顶部向左倾）。" },
+        "B'": { title: "后面 (B') 逆时针旋转", short: "后面 ↺", desc: "将后层 (B) 逆时针旋转 90°（顶部向右倾）。" },
+        "B2": { title: "后面 (B2) 旋转 180°", short: "后面 180°", desc: "将后面 (B) 旋转 180°。" }
+      }
+    };
+
+    function getMoveExp(m) {
+      const dict = MOVE_EXPLANATIONS_I18N[currentLang] || MOVE_EXPLANATIONS_I18N.en;
+      return dict[m] || { title: m, short: m, desc: m };
+    }
+
+    /*************************************************************************
+     * 2. MATHEMATICAL CUBE COORDINATE & FACELET SYSTEM
+     *************************************************************************/
+    function getSticker3DInfo(face, idx) {
+      const row = Math.floor(idx / 3);
+      const col = idx % 3;
+      let x = 0, y = 0, z = 0;
+      let nx = 0, ny = 0, nz = 0;
+      if (face === 'U') {
+        y = 1; ny = 1;
+        z = row - 1;
+        x = col - 1;
+      } else if (face === 'D') {
+        y = -1; ny = -1;
+        z = 1 - row;
+        x = col - 1;
+      } else if (face === 'F') {
+        z = 1; nz = 1;
+        y = 1 - row;
+        x = col - 1;
+      } else if (face === 'B') {
+        z = -1; nz = -1;
+        y = 1 - row;
+        x = 1 - col;
+      } else if (face === 'L') {
+        x = -1; nx = -1;
+        y = 1 - row;
+        z = col - 1;
+      } else if (face === 'R') {
+        x = 1; nx = 1;
+        y = 1 - row;
+        z = 1 - col;
+      }
+      return { face, idx, x, y, z, nx, ny, nz };
+    }
+
+    function coordsAndNormalToFaceIdx(x, y, z, nx, ny, nz) {
+      let face = '';
+      let row = 0, col = 0;
+      if (ny === 1) {
+        face = 'U'; row = z + 1; col = x + 1;
+      } else if (ny === -1) {
+        face = 'D'; row = 1 - z; col = x + 1;
+      } else if (nz === 1) {
+        face = 'F'; row = 1 - y; col = x + 1;
+      } else if (nz === -1) {
+        face = 'B'; row = 1 - y; col = 1 - x;
+      } else if (nx === -1) {
+        face = 'L'; row = 1 - y; col = z + 1;
+      } else if (nx === 1) {
+        face = 'R'; row = 1 - y; col = 1 - z;
+      }
+      return { face, idx: row * 3 + col };
+    }
+
+    function createEmptyGrayState() {
+      const st = {};
+      FACE_ORDER.forEach(f => { st[f] = Array(9).fill('X'); });
+      return st;
+    }
+
+    function createSolvedState() {
+      const st = {};
+      PALETTE.forEach(p => {
+        if (p.stdFace) st[p.stdFace] = Array(9).fill(p.code);
+      });
+      return st;
+    }
+
+    function cloneState(st) {
+      const copy = {};
+      FACE_ORDER.forEach(f => { copy[f] = st[f].slice(); });
+      return copy;
+    }
+
+    function rotateVec90OutwardCW(vx, vy, vz, ax, ay, az) {
+      const dot = ax * vx + ay * vy + az * vz;
+      const cx = ay * vz - az * vy;
+      const cy = az * vx - ax * vz;
+      const cz = ax * vy - ay * vx;
+      return [
+        Math.round(ax * dot - cx),
+        Math.round(ay * dot - cy),
+        Math.round(az * dot - cz)
+      ];
+    }
+
+    const MOVE_SPECS = {
+      'U': { axis: [0, 1, 0], filter: (x, y, z) => y === 1, turns: 1 },
+      "U'": { axis: [0, 1, 0], filter: (x, y, z) => y === 1, turns: 3 },
+      'U2': { axis: [0, 1, 0], filter: (x, y, z) => y === 1, turns: 2 },
+      'D': { axis: [0, -1, 0], filter: (x, y, z) => y === -1, turns: 1 },
+      "D'": { axis: [0, -1, 0], filter: (x, y, z) => y === -1, turns: 3 },
+      'D2': { axis: [0, -1, 0], filter: (x, y, z) => y === -1, turns: 2 },
+      'F': { axis: [0, 0, 1], filter: (x, y, z) => z === 1, turns: 1 },
+      "F'": { axis: [0, 0, 1], filter: (x, y, z) => z === 1, turns: 3 },
+      'F2': { axis: [0, 0, 1], filter: (x, y, z) => z === 1, turns: 2 },
+      'B': { axis: [0, 0, -1], filter: (x, y, z) => z === -1, turns: 1 },
+      "B'": { axis: [0, 0, -1], filter: (x, y, z) => z === -1, turns: 3 },
+      'B2': { axis: [0, 0, -1], filter: (x, y, z) => z === -1, turns: 2 },
+      'L': { axis: [-1, 0, 0], filter: (x, y, z) => x === -1, turns: 1 },
+      "L'": { axis: [-1, 0, 0], filter: (x, y, z) => x === -1, turns: 3 },
+      'L2': { axis: [-1, 0, 0], filter: (x, y, z) => x === -1, turns: 2 },
+      'R': { axis: [1, 0, 0], filter: (x, y, z) => x === 1, turns: 1 },
+      "R'": { axis: [1, 0, 0], filter: (x, y, z) => x === 1, turns: 3 },
+      'R2': { axis: [1, 0, 0], filter: (x, y, z) => x === 1, turns: 2 }
+    };
+
+    function applyMoveToState(state, moveStr) {
+      const spec = MOVE_SPECS[moveStr];
+      if (!spec) return cloneState(state);
+      let cur = cloneState(state);
+      const [ax, ay, az] = spec.axis;
+
+      for (let t = 0; t < spec.turns; t++) {
+        const next = cloneState(cur);
+        FACE_ORDER.forEach(face => {
+          for (let idx = 0; idx < 9; idx++) {
+            const info = getSticker3DInfo(face, idx);
+            if (spec.filter(info.x, info.y, info.z)) {
+              const [nx2, ny2, nz2] = rotateVec90OutwardCW(info.nx, info.ny, info.nz, ax, ay, az);
+              const [x2, y2, z2] = rotateVec90OutwardCW(info.x, info.y, info.z, ax, ay, az);
+              const dest = coordsAndNormalToFaceIdx(x2, y2, z2, nx2, ny2, nz2);
+              next[dest.face][dest.idx] = cur[face][idx];
+            }
+          }
+        });
+        cur = next;
+      }
+      return cur;
+    }
+
+    function applyMoveSequence(state, moves) {
+      let s = cloneState(state);
+      const list = Array.isArray(moves) ? moves : moves.trim().split(/\s+/).filter(Boolean);
+      for (const m of list) {
+        s = applyMoveToState(s, m);
+      }
+      return s;
+    }
+
+    /*************************************************************************
+     * 3. UNIVERSAL 3x3 VALIDATOR & LAYER-BY-LAYER SOLVER FOR ALL CASES
+     *************************************************************************/
+    const EDGE_POSITIONS = [
+      { name: 'DF', coords: [0, -1, 1], faces: ['D', 'F'] },
+      { name: 'DR', coords: [1, -1, 0], faces: ['D', 'R'] },
+      { name: 'DB', coords: [0, -1, -1], faces: ['D', 'B'] },
+      { name: 'DL', coords: [-1, -1, 0], faces: ['D', 'L'] },
+      { name: 'FR', coords: [1, 0, 1], faces: ['F', 'R'] },
+      { name: 'BR', coords: [1, 0, -1], faces: ['B', 'R'] },
+      { name: 'BL', coords: [-1, 0, -1], faces: ['B', 'L'] },
+      { name: 'FL', coords: [-1, 0, 1], faces: ['F', 'L'] },
+      { name: 'UF', coords: [0, 1, 1], faces: ['U', 'F'] },
+      { name: 'UR', coords: [1, 1, 0], faces: ['U', 'R'] },
+      { name: 'UB', coords: [0, 1, -1], faces: ['U', 'B'] },
+      { name: 'UL', coords: [-1, 1, 0], faces: ['U', 'L'] }
+    ];
+
+    const CORNER_POSITIONS = [
+      { name: 'DFR', coords: [1, -1, 1], faces: ['D', 'F', 'R'] },
+      { name: 'DBR', coords: [1, -1, -1], faces: ['D', 'R', 'B'] },
+      { name: 'DBL', coords: [-1, -1, -1], faces: ['D', 'B', 'L'] },
+      { name: 'DFL', coords: [-1, -1, 1], faces: ['D', 'L', 'F'] },
+      { name: 'UFR', coords: [1, 1, 1], faces: ['U', 'R', 'F'] },
+      { name: 'UBR', coords: [1, 1, -1], faces: ['U', 'B', 'R'] },
+      { name: 'UBL', coords: [-1, 1, -1], faces: ['U', 'L', 'B'] },
+      { name: 'UFL', coords: [-1, 1, 1], faces: ['U', 'F', 'L'] }
+    ];
+
+    function faceNormalVec(face) {
+      if (face === 'U') return [0, 1, 0];
+      if (face === 'D') return [0, -1, 0];
+      if (face === 'F') return [0, 0, 1];
+      if (face === 'B') return [0, 0, -1];
+      if (face === 'L') return [-1, 0, 0];
+      if (face === 'R') return [1, 0, 0];
+      return [0, 0, 0];
+    }
+
+    function getStickerAtCubieFace(state, coords, face) {
+      const [x, y, z] = coords;
+      const [nx, ny, nz] = faceNormalVec(face);
+      const { idx } = coordsAndNormalToFaceIdx(x, y, z, nx, ny, nz);
+      return state[face][idx];
+    }
+
+    function validateCubeState(state) {
+      const L = I18N[currentLang];
+      let grayCount = 0;
+      const counts = { W: 0, Y: 0, R: 0, O: 0, G: 0, B: 0 };
+      FACE_ORDER.forEach(f => {
+        state[f].forEach(c => {
+          if (c === 'X' || !counts.hasOwnProperty(c)) grayCount++;
+          else counts[c]++;
+        });
+      });
+
+      if (grayCount > 0) {
+        return {
+          valid: false,
+          code: 'INCOMPLETE',
+          grayCount,
+          message: L.valIncompleteMsg(grayCount)
+        };
+      }
+
+      const wrongColors = [];
+      for (const p of PALETTE) {
+        if (p.code === 'X') continue;
+        if (counts[p.code] !== 9) {
+          wrongColors.push(`${getColorName(p.code)}: ${counts[p.code]}/9`);
+        }
+      }
+      if (wrongColors.length > 0) {
+        return {
+          valid: false,
+          code: 'COLOR_COUNT',
+          message: L.valColorCountMsg(wrongColors.join(', '))
+        };
+      }
+
+      const centerColors = FACE_ORDER.map(f => state[f][4]);
+      const uniqueCenters = new Set(centerColors);
+      if (uniqueCenters.size !== 6) {
+        return {
+          valid: false,
+          code: 'DUPLICATE_CENTERS',
+          message: L.valDupCentersMsg
+        };
+      }
+
+      const colorToFace = {};
+      FACE_ORDER.forEach(f => { colorToFace[state[f][4]] = f; });
+
+      const seenEdges = new Set();
+      const edgePerm = [];
+      let edgeFlipSum = 0;
+
+      for (let i = 0; i < EDGE_POSITIONS.length; i++) {
+        const pos = EDGE_POSITIONS[i];
+        const c0 = getStickerAtCubieFace(state, pos.coords, pos.faces[0]);
+        const c1 = getStickerAtCubieFace(state, pos.coords, pos.faces[1]);
+        const f0 = colorToFace[c0];
+        const f1 = colorToFace[c1];
+        const matchIdx = EDGE_POSITIONS.findIndex(ep =>
+          (ep.faces[0] === f0 && ep.faces[1] === f1) ||
+          (ep.faces[0] === f1 && ep.faces[1] === f0)
+        );
+        if (matchIdx === -1) {
+          return {
+            valid: false,
+            code: 'INVALID_EDGE',
+            message: L.valInvalidEdgeMsg(pos.name, getColorName(c0), getColorName(c1))
+          };
+        }
+        if (seenEdges.has(matchIdx)) {
+          return {
+            valid: false,
+            code: 'DUPLICATE_EDGE',
+            message: L.valDupEdgeMsg(getColorName(c0), getColorName(c1))
+          };
+        }
+        seenEdges.add(matchIdx);
+        edgePerm.push(matchIdx);
+
+        const targetEdge = EDGE_POSITIONS[matchIdx];
+        const primaryFace = targetEdge.faces[0];
+        if (f0 !== primaryFace) edgeFlipSum += 1;
+      }
+
+      const seenCorners = new Set();
+      const cornerPerm = [];
+      let cornerTwistSum = 0;
+
+      for (let i = 0; i < CORNER_POSITIONS.length; i++) {
+        const pos = CORNER_POSITIONS[i];
+        const colors = pos.faces.map(f => getStickerAtCubieFace(state, pos.coords, f));
+        const mappedFaces = colors.map(c => colorToFace[c]);
+
+        const matchIdx = CORNER_POSITIONS.findIndex(cp => {
+          const sA = [...cp.faces].sort().join('');
+          const sB = [...mappedFaces].sort().join('');
+          return sA === sB;
+        });
+
+        const colLabel = colors.map(c => getColorName(c)).join(' - ');
+        if (matchIdx === -1) {
+          return {
+            valid: false,
+            code: 'INVALID_CORNER',
+            message: L.valInvalidCornerMsg(pos.name, colLabel)
+          };
+        }
+        if (seenCorners.has(matchIdx)) {
+          return {
+            valid: false,
+            code: 'DUPLICATE_CORNER',
+            message: L.valDupCornerMsg(colLabel)
+          };
+        }
+        seenCorners.add(matchIdx);
+        cornerPerm.push(matchIdx);
+
+        const targetFaces = CORNER_POSITIONS[matchIdx].faces;
+        let twist = -1;
+        for (let t = 0; t < 3; t++) {
+          if (
+            mappedFaces[t] === targetFaces[0] &&
+            mappedFaces[(t + 1) % 3] === targetFaces[1] &&
+            mappedFaces[(t + 2) % 3] === targetFaces[2]
+          ) {
+            twist = t;
+            break;
+          }
+        }
+        if (twist === -1) {
+          return {
+            valid: false,
+            code: 'CHIRALITY_CORNER',
+            message: L.valChiralityCornerMsg(pos.name, colLabel)
+          };
+        }
+        cornerTwistSum += twist;
+      }
+
+      if (edgeFlipSum % 2 !== 0) {
+        return {
+          valid: false,
+          code: 'EDGE_FLIP_PARITY',
+          message: L.valEdgeFlipMsg
+        };
+      }
+
+      if (cornerTwistSum % 3 !== 0) {
+        return {
+          valid: false,
+          code: 'CORNER_TWIST_PARITY',
+          message: L.valCornerTwistMsg
+        };
+      }
+
+      const countInversions = (arr) => {
+        let inv = 0;
+        for (let i = 0; i < arr.length; i++) {
+          for (let j = i + 1; j < arr.length; j++) {
+            if (arr[i] > arr[j]) inv++;
+          }
+        }
+        return inv;
+      };
+      const edgeParity = countInversions(edgePerm) % 2;
+      const cornerParity = countInversions(cornerPerm) % 2;
+      if (edgeParity !== cornerParity) {
+        return {
+          valid: false,
+          code: 'PERM_PARITY',
+          message: L.valPermParityMsg
+        };
+      }
+
+      return {
+        valid: true,
+        code: 'VALID',
+        message: L.valValidMsg
+      };
+    }
+
+    function simplifyMoves(moves) {
+      const stack = [];
+      for (const m of moves) {
+        if (!m) continue;
+        const face = m[0];
+        const turns = m.endsWith('2') ? 2 : (m.endsWith("'") ? 3 : 1);
+        if (stack.length > 0 && stack[stack.length - 1].face === face) {
+          stack[stack.length - 1].turns = (stack[stack.length - 1].turns + turns) % 4;
+          if (stack[stack.length - 1].turns === 0) stack.pop();
+        } else {
+          stack.push({ face, turns });
+        }
+      }
+      return stack.map(item => {
+        if (item.turns === 1) return item.face;
+        if (item.turns === 2) return item.face + '2';
+        return item.face + "'";
+      });
+    }
+
+    function bfsSolveSubgoal(startState, goalCheckFn, allowedMoves, maxDepth = 7) {
+      if (goalCheckFn(startState)) return [];
+      const queue = [{ state: startState, moves: [] }];
+
+      while (queue.length > 0) {
+        const cur = queue.shift();
+        if (cur.moves.length >= maxDepth) continue;
+        const lastFace = cur.moves.length > 0 ? cur.moves[cur.moves.length - 1][0] : null;
+
+        for (const m of allowedMoves) {
+          if (m[0] === lastFace) continue;
+          const nextState = applyMoveToState(cur.state, m);
+          const nextMoves = [...cur.moves, m];
+          if (goalCheckFn(nextState)) return nextMoves;
+          if (nextMoves.length < maxDepth) {
+            queue.push({ state: nextState, moves: nextMoves });
+          }
+        }
+      }
+      return null;
+    }
+
+    function solveCubeLayerByLayer(initialState) {
+      const check = validateCubeState(initialState);
+      if (!check.valid) {
+        return { ok: false, error: check.message };
+      }
+
+      let cur = cloneState(initialState);
+      const cU = cur.U[4], cD = cur.D[4], cF = cur.F[4], cB = cur.B[4], cL = cur.L[4], cR = cur.R[4];
+      const faceCenterColor = { U: cU, D: cD, F: cF, B: cB, L: cL, R: cR };
+      const stageMeta = I18N[currentLang].stageMeta(getColorName(cD), getColorName(cU));
+
+      const stages = [];
+      const applyAndRecord = (stageMoves, moveList) => {
+        const list = Array.isArray(moveList) ? moveList : moveList.trim().split(/\s+/).filter(Boolean);
+        for (const m of list) {
+          cur = applyMoveToState(cur, m);
+          stageMoves.push(m);
+        }
+      };
+
+      const isEdgeSolved = (st, posName) => {
+        const ep = EDGE_POSITIONS.find(e => e.name === posName);
+        return ep.faces.every(f => getStickerAtCubieFace(st, ep.coords, f) === faceCenterColor[f]);
+      };
+
+      const isCornerSolved = (st, posName) => {
+        const cp = CORNER_POSITIONS.find(c => c.name === posName);
+        return cp.faces.every(f => getStickerAtCubieFace(st, cp.coords, f) === faceCenterColor[f]);
+      };
+
+      const findEdgeByColors = (st, colA, colB) => {
+        for (const ep of EDGE_POSITIONS) {
+          const s0 = getStickerAtCubieFace(st, ep.coords, ep.faces[0]);
+          const s1 = getStickerAtCubieFace(st, ep.coords, ep.faces[1]);
+          if ((s0 === colA && s1 === colB) || (s0 === colB && s1 === colA)) {
+            return { pos: ep, s0, s1 };
+          }
+        }
+        return null;
+      };
+
+      const findCornerByColors = (st, colA, colB, colC) => {
+        const targetSet = [colA, colB, colC].sort().join('');
+        for (const cp of CORNER_POSITIONS) {
+          const cols = cp.faces.map(f => getStickerAtCubieFace(st, cp.coords, f));
+          if ([...cols].sort().join('') === targetSet) {
+            return { pos: cp, cols };
+          }
+        }
+        return null;
+      };
+
+      // STAGE 1: BOTTOM CROSS
+      const stage1Moves = [];
+      const crossTargets = ['DF', 'DR', 'DB', 'DL'];
+      const allBasicMoves = ['U', "U'", 'U2', 'R', "R'", 'R2', 'L', "L'", 'L2', 'F', "F'", 'F2', 'B', "B'", 'B2', 'D', "D'", 'D2'];
+
+      for (let i = 0; i < crossTargets.length; i++) {
+        const targetName = crossTargets[i];
+        const requiredEdges = crossTargets.slice(0, i + 1);
+        const goalFn = (st) => requiredEdges.every(name => isEdgeSolved(st, name));
+
+        if (!goalFn(cur)) {
+          let seq = bfsSolveSubgoal(cur, goalFn, allBasicMoves, 4);
+          if (!seq) {
+            const targetEp = EDGE_POSITIONS.find(e => e.name === targetName);
+            const sideFace = targetEp.faces[1];
+            const sideColor = faceCenterColor[sideFace];
+            const found = findEdgeByColors(cur, cD, sideColor);
+
+            if (found && found.pos.coords[1] === -1) {
+              const popFace = found.pos.faces[1];
+              applyAndRecord(stage1Moves, [popFace + '2']);
+            } else if (found && found.pos.coords[1] === 0) {
+              const midMap = {
+                'FR': ["R", "U", "R'"],
+                'BR': ["R'", "U", "R"],
+                'BL': ["L", "U", "L'"],
+                'FL': ["L'", "U", "L"]
+              };
+              applyAndRecord(stage1Moves, midMap[found.pos.name]);
+            }
+            seq = bfsSolveSubgoal(cur, goalFn, ['U', "U'", 'U2', 'F', "F'", 'F2', 'R', "R'", 'R2', 'B', "B'", 'B2', 'L', "L'", 'L2'], 5);
+          }
+          if (seq) applyAndRecord(stage1Moves, seq);
+        }
+      }
+
+      stages.push({
+        id: 1,
+        name: stageMeta[1].name,
+        tip: stageMeta[1].tip,
+        moves: simplifyMoves(stage1Moves)
+      });
+
+      // STAGE 2: FIRST LAYER CORNERS
+      const stage2Moves = [];
+      const cornerTargets = [
+        { dSlot: 'DFR', uSlot: 'UFR', cols: [cD, cF, cR], popSeq: ["R", "U", "R'"], sexySeq: ["R", "U", "R'", "U'"] },
+        { dSlot: 'DBR', uSlot: 'UBR', cols: [cD, cR, cB], popSeq: ["B", "U", "B'"], sexySeq: ["B", "U", "B'", "U'"] },
+        { dSlot: 'DBL', uSlot: 'UBL', cols: [cD, cB, cL], popSeq: ["L", "U", "L'"], sexySeq: ["L", "U", "L'", "U'"] },
+        { dSlot: 'DFL', uSlot: 'UFL', cols: [cD, cL, cF], popSeq: ["F", "U", "F'"], sexySeq: ["F", "U", "F'", "U'"] }
+      ];
+
+      for (const ct of cornerTargets) {
+        if (isCornerSolved(cur, ct.dSlot)) continue;
+        let found = findCornerByColors(cur, ct.cols[0], ct.cols[1], ct.cols[2]);
+        if (found && found.pos.coords[1] === -1) {
+          const holder = cornerTargets.find(x => x.dSlot === found.pos.name);
+          applyAndRecord(stage2Moves, holder.popSeq);
+        }
+        for (let uTry = 0; uTry < 4; uTry++) {
+          found = findCornerByColors(cur, ct.cols[0], ct.cols[1], ct.cols[2]);
+          if (found && found.pos.name === ct.uSlot) break;
+          applyAndRecord(stage2Moves, ['U']);
+        }
+        for (let rep = 0; rep < 5; rep++) {
+          if (isCornerSolved(cur, ct.dSlot)) break;
+          applyAndRecord(stage2Moves, ct.sexySeq);
+        }
+      }
+
+      stages.push({
+        id: 2,
+        name: stageMeta[2].name,
+        tip: stageMeta[2].tip,
+        moves: simplifyMoves(stage2Moves)
+      });
+
+      // STAGE 3: MIDDLE LAYER EDGES
+      const stage3Moves = [];
+      const midTargets = [
+        {
+          slot: 'FR', cA: cF, cB: cR,
+          fromFirstFace: 'UF', insRight: ["U", "R", "U'", "R'", "U'", "F'", "U", "F"],
+          fromSecondFace: 'UR', insLeft: ["U'", "F'", "U", "F", "U", "R", "U'", "R'"]
+        },
+        {
+          slot: 'BR', cA: cR, cB: cB,
+          fromFirstFace: 'UR', insRight: ["U", "B", "U'", "B'", "U'", "R'", "U", "R"],
+          fromSecondFace: 'UB', insLeft: ["U'", "R'", "U", "R", "U", "B", "U'", "B'"]
+        },
+        {
+          slot: 'BL', cA: cB, cB: cL,
+          fromFirstFace: 'UB', insRight: ["U", "L", "U'", "L'", "U'", "B'", "U", "B"],
+          fromSecondFace: 'UL', insLeft: ["U'", "B'", "U", "B", "U", "L", "U'", "L'"]
+        },
+        {
+          slot: 'FL', cA: cL, cB: cF,
+          fromFirstFace: 'UL', insRight: ["U", "F", "U'", "F'", "U'", "L'", "U", "L"],
+          fromSecondFace: 'UF', insLeft: ["U'", "L'", "U", "L", "U", "F", "U'", "F'"]
+        }
+      ];
+
+      for (const mt of midTargets) {
+        if (isEdgeSolved(cur, mt.slot)) continue;
+        let found = findEdgeByColors(cur, mt.cA, mt.cB);
+        if (found && found.pos.coords[1] === 0) {
+          const trappedHolder = midTargets.find(x => x.slot === found.pos.name);
+          applyAndRecord(stage3Moves, trappedHolder.insRight);
+        }
+        for (let uTry = 0; uTry < 4; uTry++) {
+          found = findEdgeByColors(cur, mt.cA, mt.cB);
+          if (found && found.pos.name === mt.fromFirstFace) {
+            const sideSticker = getStickerAtCubieFace(cur, found.pos.coords, found.pos.faces[1]);
+            if (sideSticker === mt.cA) {
+              applyAndRecord(stage3Moves, mt.insRight);
+              break;
+            }
+          }
+          if (found && found.pos.name === mt.fromSecondFace) {
+            const sideSticker = getStickerAtCubieFace(cur, found.pos.coords, found.pos.faces[1]);
+            if (sideSticker === mt.cB) {
+              applyAndRecord(stage3Moves, mt.insLeft);
+              break;
+            }
+          }
+          applyAndRecord(stage3Moves, ['U']);
+        }
+      }
+
+      stages.push({
+        id: 3,
+        name: stageMeta[3].name,
+        tip: stageMeta[3].tip,
+        moves: simplifyMoves(stage3Moves)
+      });
+
+      // STAGE 4: TOP CROSS ORIENTATION
+      const stage4Moves = [];
+      const uEdges = ['UF', 'UR', 'UB', 'UL'];
+      const getUOrientedMask = (st) => uEdges.map(name => {
+        const ep = EDGE_POSITIONS.find(e => e.name === name);
+        return getStickerAtCubieFace(st, ep.coords, 'U') === cU;
+      });
+
+      for (let safety = 0; safety < 6; safety++) {
+        const mask = getUOrientedMask(cur);
+        const count = mask.filter(Boolean).length;
+        if (count === 4) break;
+
+        if (count === 0) {
+          applyAndRecord(stage4Moves, ["F", "R", "U", "R'", "U'", "F'"]);
+        } else if (count === 2) {
+          if (mask[1] && mask[3]) {
+            applyAndRecord(stage4Moves, ["F", "R", "U", "R'", "U'", "F'"]);
+          } else if (mask[0] && mask[2]) {
+            applyAndRecord(stage4Moves, ["U", "F", "R", "U", "R'", "U'", "F'"]);
+          } else {
+            for (let u = 0; u < 4; u++) {
+              const m2 = getUOrientedMask(cur);
+              if (m2[2] && m2[3]) break;
+              applyAndRecord(stage4Moves, ["U"]);
+            }
+            applyAndRecord(stage4Moves, ["F", "R", "U", "R'", "U'", "F'"]);
+          }
+        }
+      }
+
+      stages.push({
+        id: 4,
+        name: stageMeta[4].name,
+        tip: stageMeta[4].tip,
+        moves: simplifyMoves(stage4Moves)
+      });
+
+      // STAGE 5: TOP EDGES ALIGNMENT
+      const stage5Moves = [];
+      const checkTopEdgesMatched = (st) => uEdges.map(name => isEdgeSolved(st, name));
+      const suneVariants = [
+        ["R", "U", "R'", "U", "R", "U2", "R'"],
+        ["B", "U", "B'", "U", "B", "U2", "B'"],
+        ["L", "U", "L'", "U", "L", "U2", "L'"],
+        ["F", "U", "F'", "U", "F", "U2", "F'"]
+      ];
+      const uAdjusts = [null, "U", "U'", "U2"];
+
+      for (let safety = 0; safety < 6; safety++) {
+        let solvedU = undefined;
+        for (const uMove of uAdjusts) {
+          const testSt = uMove ? applyMoveToState(cur, uMove) : cur;
+          if (checkTopEdgesMatched(testSt).every(Boolean)) {
+            solvedU = uMove;
+            break;
+          }
+        }
+        if (solvedU !== undefined) {
+          if (solvedU) applyAndRecord(stage5Moves, [solvedU]);
+          break;
+        }
+
+        let oneSuneSeq = null;
+        for (const preU of uAdjusts) {
+          for (const sune of suneVariants) {
+            for (const postU of uAdjusts) {
+              const seq = [...(preU ? [preU] : []), ...sune, ...(postU ? [postU] : [])];
+              const testSt = applyMoveSequence(cur, seq);
+              if (checkTopEdgesMatched(testSt).every(Boolean)) {
+                oneSuneSeq = seq;
+                break;
+              }
+            }
+            if (oneSuneSeq) break;
+          }
+          if (oneSuneSeq) break;
+        }
+
+        if (oneSuneSeq) {
+          applyAndRecord(stage5Moves, oneSuneSeq);
+          break;
+        } else {
+          applyAndRecord(stage5Moves, suneVariants[0]);
+        }
+      }
+
+      stages.push({
+        id: 5,
+        name: stageMeta[5].name,
+        tip: stageMeta[5].tip,
+        moves: simplifyMoves(stage5Moves)
+      });
+
+      // STAGE 6: TOP CORNERS PERMUTATION
+      const stage6Moves = [];
+      const uCorners = ['UFR', 'UBR', 'UBL', 'UFL'];
+      const isCornerInRightPlace = (st, posName) => {
+        const cp = CORNER_POSITIONS.find(c => c.name === posName);
+        const expectedColors = cp.faces.map(f => faceCenterColor[f]).sort().join('');
+        const actualColors = cp.faces.map(f => getStickerAtCubieFace(st, cp.coords, f)).sort().join('');
+        return expectedColors === actualColors;
+      };
+
+      const niklasR = ["U", "R", "U'", "L'", "U", "R'", "U'", "L"];
+
+      for (let safety = 0; safety < 8; safety++) {
+        const inPlace = uCorners.map(name => isCornerInRightPlace(cur, name));
+        const count = inPlace.filter(Boolean).length;
+        if (count === 4) break;
+
+        if (count === 0) {
+          applyAndRecord(stage6Moves, niklasR);
+        } else {
+          const niklasByCorner = {
+            'UFR': ["U", "R", "U'", "L'", "U", "R'", "U'", "L"],
+            'UBR': ["U", "B", "U'", "F'", "U", "B'", "U'", "F"],
+            'UBL': ["U", "L", "U'", "R'", "U", "L'", "U'", "R"],
+            'UFL': ["U", "F", "U'", "B'", "U", "F'", "U'", "B"]
+          };
+          const fixedName = uCorners.find((_, idx) => inPlace[idx]);
+          applyAndRecord(stage6Moves, niklasByCorner[fixedName]);
+        }
+      }
+
+      stages.push({
+        id: 6,
+        name: stageMeta[6].name,
+        tip: stageMeta[6].tip,
+        moves: simplifyMoves(stage6Moves)
+      });
+
+      // STAGE 7: TOP CORNERS ORIENTATION
+      const stage7Moves = [];
+      const twistPair = ["R'", "D'", "R", "D", "R'", "D'", "R", "D"];
+
+      for (let cStep = 0; cStep < 4; cStep++) {
+        for (let rep = 0; rep < 3; rep++) {
+          const uSticker = getStickerAtCubieFace(cur, [1, 1, 1], 'U');
+          if (uSticker === cU) break;
+          applyAndRecord(stage7Moves, twistPair);
+        }
+        applyAndRecord(stage7Moves, ["U"]);
+      }
+
+      for (let u = 0; u < 4; u++) {
+        if (isEdgeSolved(cur, 'UF')) break;
+        applyAndRecord(stage7Moves, ["U"]);
+      }
+
+      stages.push({
+        id: 7,
+        name: stageMeta[7].name,
+        tip: stageMeta[7].tip,
+        moves: simplifyMoves(stage7Moves)
+      });
+
+      const isCompletelySolved = FACE_ORDER.every(f => cur[f].every(c => c === cur[f][4]));
+      const flatMoves = [];
+      const stepRecords = [];
+
+      stages.forEach(st => {
+        st.moves.forEach((m, idxInStage) => {
+          const exp = getMoveExp(m);
+          stepRecords.push({
+            index: stepRecords.length + 1,
+            move: m,
+            stageId: st.id,
+            stageName: st.name,
+            stageTip: st.tip,
+            stepInStage: idxInStage + 1,
+            totalInStage: st.moves.length,
+            title: exp.title,
+            short: exp.short,
+            desc: exp.desc
+          });
+          flatMoves.push(m);
+        });
+      });
+
+      return {
+        ok: isCompletelySolved,
+        stages,
+        steps: stepRecords,
+        flatMoves,
+        finalState: cur
+      };
+    }
+
+    /*************************************************************************
+     * 4. MULTILINGUAL CASE LIBRARY (10 CASES IN EN, VI, ZH)
+     *************************************************************************/
+    const CASE_LIBRARY = [
+      {
+        id: 'case_cross_flipped',
+        formula: "F U' R U",
+        setupInverse: ["U'", "R'", "U", "F'"],
+        i18n: {
+          en: {
+            stage: "Layer 1 — Bottom Cross",
+            title: "Case 1: Flipped Cross Edge on Front Face",
+            badge: "Most Common",
+            desc: "When the cross edge is already on the Front face but its colors are flipped: turn F to move it right, push U', then insert with R."
+          },
+          vi: {
+            stage: "Tầng 1 — Dấu Cộng Trắng",
+            title: "Trường hợp 1: Viên cạnh Dấu Cộng bị ngược màu",
+            badge: "Hay gặp nhất",
+            desc: "Khi viên cạnh đã nằm ở mặt Trước nhưng bị lật ngược màu so với tâm: xoay F đưa nó sang bên phải, đẩy U' rồi đưa lên R."
+          },
+          zh: {
+            stage: "第一层 — 底层十字",
+            title: "情况 1：底层十字棱块颜色装反（原位翻转）",
+            badge: "最常见",
+            desc: "当十字棱块已在前面但颜色上下颠倒时：转 F 移至右侧，拨 U' 让开顶层，再转 R 归位。"
+          }
+        }
+      },
+      {
+        id: 'case_corner_right',
+        formula: "R U R' U'",
+        setupInverse: ["U", "R", "U'", "R'"],
+        i18n: {
+          en: {
+            stage: "Layer 1 — First Layer Corners",
+            title: "Case 2: Bottom Sticker Facing Right (1x 4-Step Trigger)",
+            badge: "Up - Left - Down - Right",
+            desc: "Position the corner at Front-Top-Right (UFR). Execute the 4-step trigger (R U R' U') once to drop the corner directly into place."
+          },
+          vi: {
+            stage: "Tầng 1 — 4 Góc Đáy (Quy tắc 4 bước)",
+            title: "Trường hợp 2: Góc tầng 1 có màu đáy hướng sang Phải (1 lần 4 bước)",
+            badge: "Lên - Sang - Xuống - Về",
+            desc: "Đặt viên góc ở phía trên bên phải vị trí cần vào. Thực hiện đúng 1 lần tổ hợp \"Lên - Sang - Xuống - Về\" (R U R' U') là viên góc vào khớp ngay."
+          },
+          zh: {
+            stage: "第一层 — 底层四فر角块",
+            title: "情况 2：角块底色朝右（做 1 次上左下右）",
+            badge: "上 - 左 - 下 - 右",
+            desc: "将角块放在目标槽位正上方(UFR)，执行 1 次“上-左-下-右” (R U R' U') 即可直接归位。"
+          }
+        }
+      },
+      {
+        id: 'case_corner_up',
+        formula: "R U R' U' R U R' U' R U R' U'",
+        setupInverse: ["U", "R", "U'", "R'", "U", "R", "U'", "R'", "U", "R", "U'", "R'"],
+        i18n: {
+          en: {
+            stage: "Layer 1 — First Layer Corners",
+            title: "Case 3: Bottom Sticker Facing Up (3x 4-Step Trigger)",
+            badge: "Repeat 3x",
+            desc: "When the bottom sticker of the corner faces straight UP on the U face, repeat (R U R' U') 3 times in a row."
+          },
+          vi: {
+            stage: "Tầng 1 — 4 Góc Đáy (Quy tắc 4 bước)",
+            title: "Trường hợp 3: Góc tầng 1 có màu đáy ngửa lên Trên (3 lần 4 bước)",
+            badge: "Lặp 3 lần",
+            desc: "Khi màu đáy của viên góc ngửa thẳng lên mặt Trên (U), bạn chỉ cần lặp lại tổ hợp \"Lên - Sang - Xuống - Về\" (R U R' U') 3 lần liên tiếp."
+          },
+          zh: {
+            stage: "第一层 — 底层四个角块",
+            title: "情况 3：角块底色朝上（连续做 3 次上左下右）",
+            badge: "连续 3 次",
+            desc: "当角块的底面颜色朝正上方(U)时，连续重复 3 次 (R U R' U') 即可完美归位。"
+          }
+        }
+      },
+      {
+        id: 'case_f2l_right',
+        formula: "U R U' R' U' F' U F",
+        setupInverse: ["F'", "U'", "F", "U", "R", "U", "R'", "U'"],
+        i18n: {
+          en: {
+            stage: "Layer 2 — Middle Layer Edges",
+            title: "Case 4: Insert Top Edge into Front-Right Slot (FR)",
+            badge: "Right Insert",
+            desc: "Align the front sticker of the edge with the Front center to form a vertical T, then apply the 8-move Right Insert formula."
+          },
+          vi: {
+            stage: "Tầng 2 — 4 Cạnh Tầng Giữa",
+            title: "Trường hợp 4: Đưa viên cạnh từ tầng Trên xuống khe bên Phải (FR)",
+            badge: "Cạnh sang Phải",
+            desc: "Sau khi xoay U để mặt trước của viên cạnh trùng màu tâm Trước (tạo chữ T dọc), dùng công thức 8 bước để đưa cạnh xuống khe Phải."
+          },
+          zh: {
+            stage: "第二层 — 中层四个棱块",
+            title: "情况 4：顶层棱块归位到右前槽位 (FR)",
+            badge: "向右侧归位",
+            desc: "转动 U 使棱块前面颜色与前中心块对齐成竖直T字，执行8步右手公式归入右侧槽位。"
+          }
+        }
+      },
+      {
+        id: 'case_f2l_left',
+        formula: "U' L' U L U F U' F'",
+        setupInverse: ["F", "U", "F'", "U'", "L'", "U'", "L", "U"],
+        i18n: {
+          en: {
+            stage: "Layer 2 — Middle Layer Edges",
+            title: "Case 5: Insert Top Edge into Front-Left Slot (FL)",
+            badge: "Left Insert",
+            desc: "Mirror of the Right Insert: push U' away to the right first, then catch with the Left hand (L' U L) and Front face (U F U' F')."
+          },
+          vi: {
+            stage: "Tầng 2 — 4 Cạnh Tầng Giữa",
+            title: "Trường hợp 5: Đưa viên cạnh từ tầng Trên xuống khe bên Trái (FL)",
+            badge: "Cạnh sang Trái",
+            desc: "Tương tự trường hợp sang phải nhưng đối xứng sang bên Trái: đẩy U' ra xa bên phải trước rồi đón bằng tay trái (L' U L)."
+          },
+          zh: {
+            stage: "第二层 — 中层四个棱块",
+            title: "情况 5：顶层棱块归位到左前槽位 (FL)",
+            badge: "向左侧归位",
+            desc: "右手公式的镜像对称版：先拨 U' 移向右侧，再用左手做 (L' U L) 配合前面归位。"
+          }
+        }
+      },
+      {
+        id: 'case_oll_line',
+        formula: "F R U R' U' F'",
+        setupInverse: ["F", "U", "R", "U'", "R'", "F'"],
+        i18n: {
+          en: {
+            stage: "Layer 3 — Top Cross Orientation",
+            title: "Case 6: Horizontal Line on Top -> Top Cross",
+            badge: "Horizontal Line",
+            desc: "Hold the line HORIZONTALLY (Left to Right, never Front to Back), then turn F, execute (R U R' U'), and undo F'."
+          },
+          vi: {
+            stage: "Tầng 3 — Tạo Dấu Cộng Mặt Trên",
+            title: "Trường hợp 6: Mặt trên có Đường Thẳng Ngang -> Lên Dấu Cộng",
+            badge: "Đường ngang",
+            desc: "Đặt đường thẳng nằm NGANG (Trái - Phải, không để dọc Trước - Sau), sau đó xoay F rồi làm 1 lần (R U R' U') và trả F'."
+          },
+          zh: {
+            stage: "第三层 — 顶层十字",
+            title: "情况 6：顶面“一字横线” -> 还原顶层十字",
+            badge: "横线状态",
+            desc: "将顶面一字线横放（左右方向，切勿竖放），执行 F (R U R' U') F' 即可一步变成顶层十字。"
+          }
+        }
+      },
+      {
+        id: 'case_oll_lshape',
+        formula: "F R U R' U' F' U2 F R U R' U' F'",
+        setupInverse: ["F", "U", "R", "U'", "R'", "F'"],
+        i18n: {
+          en: {
+            stage: "Layer 3 — Top Cross Orientation",
+            title: "Case 7: Small L-Shape on Top (Hold at 9 & 12 o'clock)",
+            badge: "L-Shape",
+            desc: "Place the L-shape at Back-Left (9 o'clock and 12 o'clock), apply F (R U R' U') F' to get the Line, then apply once more for the Cross."
+          },
+          vi: {
+            stage: "Tầng 3 — Tạo Dấu Cộng Mặt Trên",
+            title: "Trường hợp 7: Mặt trên có Chữ L nhỏ (Góc 9h - 12h)",
+            badge: "Chữ L ngược",
+            desc: "Đặt chữ L ở góc Trái-Sau (hướng 9 giờ và 12 giờ), làm công thức F (R U R' U') F' để ra Đường thẳng ngang, rồi làm thêm 1 lần nữa là thành Dấu cộng."
+          },
+          zh: {
+            stage: "第三层 — 顶层十字",
+            title: "情况 7：顶面“小拐角L形”（放在9点与12点方向）",
+            badge: "小拐角状态",
+            desc: "将小拐角放在左后方（钟表9点与12点位置），做 F (R U R' U') F' 变成一字线，再做一次即成十字。"
+          }
+        }
+      },
+      {
+        id: 'case_sune_edges',
+        formula: "R U R' U R U2 R' U",
+        setupInverse: ["U'", "R", "U2", "R'", "U'", "R", "U'", "R'"],
+        i18n: {
+          en: {
+            stage: "Layer 3 — Top Edges Alignment",
+            title: "Case 8: Swap 2 Adjacent Top Edges (Sune Algorithm)",
+            badge: "Sune Formula",
+            desc: "Hold the 2 already-matched edges at the Back (B) and Right (R) faces, then apply R U R' U R U2 R' U to align all 4 edges."
+          },
+          vi: {
+            stage: "Tầng 3 — Hoán Vị Cạnh Mặt Trên",
+            title: "Trường hợp 8: Đổi chỗ 2 cạnh kề nhau trên mặt Đỉnh (Công thức Sune)",
+            badge: "Công thức Sune",
+            desc: "Giữ 2 cạnh đã đúng ở mặt Sau (B) và mặt Phải (R), thực hiện R U R' U R U2 R' U để hoán vị 2 cạnh Trước và Trái về đúng tâm."
+          },
+          zh: {
+            stage: "第三层 — 顶层棱块对齐",
+            title: "情况 8：交换两个相邻顶层棱块（小鱼公式 Sune）",
+            badge: "小鱼公式",
+            desc: "将已经对齐的2个棱块放在后面(B)和右面(R)，执行 R U R' U R U2 R' U 即可将四面棱块全部对齐。"
+          }
+        }
+      },
+      {
+        id: 'case_niklas_corners',
+        formula: "U R U' L' U R' U' L",
+        setupInverse: ["L'", "U", "R", "U'", "L", "U", "R'", "U'"],
+        i18n: {
+          en: {
+            stage: "Layer 3 — Top Corners Permutation",
+            title: "Case 9: Cycle 3 Top Corners into Position (Niklas)",
+            badge: "3-Corner Cycle",
+            desc: "Hold the 1 corner that is already in the right slot at Front-Top-Right (UFR), then apply U R U' L' U R' U' L to cycle the other 3."
+          },
+          vi: {
+            stage: "Tầng 3 — Hoán Vị 4 Góc Mặt Trên",
+            title: "Trường hợp 9: Đưa 3 góc mặt trên về đúng vị trí (Công thức Niklas)",
+            badge: "Hoán vị 3 góc",
+            desc: "Giữ viên góc đã đúng vị trí ở phía Trước-Phải (UFR), thực hiện U R U' L' U R' U' L để luân chuyển 3 góc còn lại về đúng chỗ."
+          },
+          zh: {
+            stage: "第三层 — 顶层角块归位",
+            title: "情况 9：轮换三个顶层角块位置（Niklas 公式）",
+            badge: "三角轮换",
+            desc: "将唯一位置正确的角块放在右前上方(UFR)，执行 U R U' L' U R' U' L 使其余三个角块归位。"
+          }
+        }
+      },
+      {
+        id: 'case_twist_last_corners',
+        formula: "R' D' R D R' D' R D U R' D' R D R' D' R D R' D' R D R' D' R D U'",
+        setupInverse: ["U", "D'", "R'", "D", "R", "D'", "R'", "D", "R", "D'", "R'", "D", "R", "D'", "R'", "D", "R", "U'", "D'", "R'", "D", "R", "D'", "R'", "D", "R"],
+        i18n: {
+          en: {
+            stage: "Layer 3 — Final Corner Orientation",
+            title: "Case 10: Twist Last Corners with R' D' R D (Down - Left - Up - Right)",
+            badge: "Final Step",
+            desc: "Keep Front face fixed! Repeat (R' D' R D) until the UFR corner is oriented, then turn U ONLY to bring the next twisted corner into UFR."
+          },
+          vi: {
+            stage: "Tầng 3 — Xoay Lật Góc Hoàn Thiện 6 Mặt",
+            title: "Trường hợp 10: Lật 2 góc cuối cùng bằng R' D' R D (Xuống - Trái - Lên - Phải)",
+            badge: "Bước cuối cùng",
+            desc: "Giữ cố định mặt Trước! Lặp lại (R' D' R D) cho đến khi góc UFR lật đúng màu mặt trên, sau đó xoay U để đưa góc chưa lật tiếp theo vào đúng vị trí UFR rồi làm tiếp."
+          },
+          zh: {
+            stage: "第三层 — 顶层角块翻色完成六面",
+            title: "情况 10：用 R' D' R D（下-左-上-右）翻转最后角块",
+            badge: "终极步骤",
+            desc: "保持前面固定不动！重复 (R' D' R D) 直到右前角顶面颜色正确，然后只转 U 把下一个未翻正角块移到右前角继续。"
+          }
+        }
+      }
+    ];
+
+    /*************************************************************************
+     * 5. APPLICATION STATE & WEB AUDIO SYNTHESIZER
+     *************************************************************************/
+    let cubeState = createEmptyGrayState();
+    let selectedColorCode = 'W';
+    let appMode = 'paint';
+    let touchInteractionMode = 'paint';
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    let currentSolution = null;
+    let activeCaseId = null;
+    let solutionSnapshots = [];
+    let currentStepIndex = 0;
+    let isAutoPlaying = false;
+    let autoPlayTimer = null;
+    let playSpeedMs = 520;
+    let isAnimatingMove = false;
+
+    function playClickSound(freq = 320, duration = 0.045) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.55, audioCtx.currentTime + duration);
+        gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIcon').textContent = soundEnabled ? '🔊' : '🔇';
+      if (soundEnabled) playClickSound(480, 0.06);
+    }
+
+    function setLanguage(lang) {
+      if (!I18N[lang]) return;
+      currentLang = lang;
+      document.documentElement.lang = lang;
+      playClickSound(490, 0.04);
+
+      ['en', 'vi', 'zh'].forEach(code => {
+        const btn = document.getElementById('langBtn_' + code);
+        if (!btn) return;
+        if (code === lang) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+
+      const L = I18N[lang];
+      document.getElementById('headerSubtitle').textContent = L.headerSubtitle;
+      document.getElementById('tabPaintBtn').textContent = L.tabPaint;
+      document.getElementById('tabSolveBtn').textContent = L.tabSolve;
+      document.getElementById('tabCasesBtn').textContent = L.tabCases;
+      document.getElementById('soundLabelText').textContent = L.sound;
+      document.getElementById('resetCamBtn').textContent = L.resetView;
+
+      document.getElementById('touchPaintModeBtn').textContent = L.tapPaint;
+      document.getElementById('touchOrbitModeBtn').textContent = L.dragOrbit;
+
+      document.getElementById('legendTitleText').textContent = L.legendTitle;
+      document.getElementById('legendSubText').textContent = L.legendSub;
+      document.getElementById('legendBadgesRow').innerHTML = FACE_ORDER.map(f =>
+        `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-200"><b>${f}</b>: ${L.legendFaces[f]}</span>`
+      ).join('');
+
+      document.getElementById('camViewLabel').textContent = L.viewLabel;
+      document.getElementById('camBtnUFR').textContent = L.camUFR;
+      document.getElementById('camBtnDBL').textContent = L.camDBL;
+
+      document.getElementById('manualBarTitle').textContent = L.manualBarTitle;
+      document.getElementById('manualBarHint').innerHTML = L.manualBarHint;
+      document.getElementById('demoSexyMoveBtn').textContent = L.demoSexyBtn;
+
+      document.getElementById('paintPanelTitle').textContent = L.paintPanelTitle;
+      document.getElementById('paintPanelSubtitle').textContent = L.paintPanelSubtitle;
+      document.getElementById('paletteLabelText').textContent = L.paletteLabel;
+      document.getElementById('autoFillBtnText').textContent = L.autoFillBtn;
+      document.getElementById('btnResetGrayText').textContent = L.btnResetGray;
+      document.getElementById('btnFillCentersText').textContent = L.btnFillCenters;
+      document.getElementById('btnLoadSolvedText').textContent = L.btnLoadSolved;
+      document.getElementById('btnScrambleText').textContent = L.btnScramble;
+      document.getElementById('net2DTitleText').textContent = L.net2DTitle;
+      document.getElementById('net2DLegendText').textContent = L.net2DLegend;
+      document.getElementById('autoFixBtn').textContent = L.autoFixBtn;
+      document.getElementById('solveCtaBtnText').textContent = L.solveCtaBtn;
+
+      document.getElementById('solvePanelTitle').textContent = L.solvePanelTitle;
+      document.getElementById('editColorsBackBtn').textContent = L.editColorsBtn;
+      document.getElementById('btnJumpStart').textContent = L.btnStart;
+      document.getElementById('btnStepBack').textContent = L.btnPrev;
+      document.getElementById('playPauseBtn').textContent = isAutoPlaying ? L.btnPause : L.btnPlay;
+      document.getElementById('btnStepNext').textContent = L.btnNext;
+      document.getElementById('btnJumpEnd').textContent = L.btnEnd;
+      document.getElementById('speedLabelText').textContent = L.speedLabel;
+      document.getElementById('spdSlow').textContent = L.spdSlow;
+      document.getElementById('spdMed').textContent = L.spdMed;
+      document.getElementById('spdFast').textContent = L.spdFast;
+
+      document.getElementById('casesPanelTitle').textContent = L.casesPanelTitle;
+      document.getElementById('casesPanelSubtitle').textContent = L.casesPanelSubtitle;
+
+      // Update viewport mode header text
+      const labelEl = document.getElementById('viewportModeLabel');
+      const hintEl = document.getElementById('viewportHintText');
+      if (appMode === 'paint') {
+        labelEl.textContent = L.modePaint;
+        hintEl.textContent = L.hintPaint;
+      } else if (appMode === 'solve') {
+        labelEl.textContent = L.modeSolve;
+        hintEl.textContent = L.hintSolve;
+      } else {
+        labelEl.textContent = L.modeCases;
+        hintEl.textContent = L.hintCases;
+      }
+
+      // Refresh 3D center textures and all UI panels in the newly selected language
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+      renderCaseLibraryUI();
+
+      // Re-localize active solution if present
+      if (currentSolution) {
+        refreshCurrentSolutionLanguage();
+        renderSolvePanelUI();
+      } else if (appMode === 'solve') {
+        const check = validateCubeState(cubeState);
+        renderEmptySolvePanel(check.message);
+      }
+    }
+
+    function refreshCurrentSolutionLanguage() {
+      if (!currentSolution) return;
+      if (activeCaseId) {
+        const item = CASE_LIBRARY.find(c => c.id === activeCaseId);
+        if (item) {
+          const loc = item.i18n[currentLang] || item.i18n.en;
+          currentSolution.stages[0].name = loc.title;
+          currentSolution.stages[0].tip = loc.desc;
+          currentSolution.steps.forEach(s => {
+            const exp = getMoveExp(s.move);
+            s.stageName = loc.title;
+            s.stageTip = loc.desc;
+            s.title = exp.title;
+            s.short = exp.short;
+            s.desc = exp.desc;
+          });
+        }
+      } else if (solutionSnapshots.length > 0) {
+        const baseSt = solutionSnapshots[0];
+        const cD = baseSt.D[4];
+        const cU = baseSt.U[4];
+        const stageMeta = I18N[currentLang].stageMeta(getColorName(cD), getColorName(cU));
+        currentSolution.stages.forEach(st => {
+          if (stageMeta[st.id]) {
+            st.name = stageMeta[st.id].name;
+            st.tip = stageMeta[st.id].tip;
+          }
+        });
+        currentSolution.steps.forEach(s => {
+          const exp = getMoveExp(s.move);
+          if (stageMeta[s.stageId]) {
+            s.stageName = stageMeta[s.stageId].name;
+            s.stageTip = stageMeta[s.stageId].tip;
+          }
+          s.title = exp.title;
+          s.short = exp.short;
+          s.desc = exp.desc;
+        });
+      }
+    }
+
+    /*************************************************************************
+     * 6. THREE.JS 3D RUBIK'S CUBE SCENE & ANIMATION ENGINE
+     *************************************************************************/
+    let scene, camera, renderer, cubeRootGroup, pivotGroup;
+    let cubieMeshes = [];
+    let stickerMeshes = [];
+    let raycaster, mouseNDC;
+
+    let camRadius = 9.2;
+    let camTheta = 0.68;
+    let camPhi = 1.05;
+    let isPointerDown = false;
+    let isOrbitDragging = false;
+    let pointerDownPos = { x: 0, y: 0 };
+    let lastPointerPos = { x: 0, y: 0 };
+
+    function initThreeScene() {
+      const container = document.getElementById('canvasContainer');
+      const w = container.clientWidth || 640;
+      const h = container.clientHeight || 460;
+
+      scene = new THREE.Scene();
+
+      camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 100);
+      updateCameraFromSpherical();
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+
+      const ambient = new THREE.AmbientLight(0xffffff, 0.78);
+      scene.add(ambient);
+
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.65);
+      dirLight1.position.set(12, 18, 15);
+      scene.add(dirLight1);
+
+      const dirLight2 = new THREE.DirectionalLight(0x93c5fd, 0.32);
+      dirLight2.position.set(-14, -12, -10);
+      scene.add(dirLight2);
+
+      cubeRootGroup = new THREE.Group();
+      scene.add(cubeRootGroup);
+
+      pivotGroup = new THREE.Group();
+      cubeRootGroup.add(pivotGroup);
+
+      raycaster = new THREE.Raycaster();
+      mouseNDC = new THREE.Vector2();
+
+      build3DCubies();
+      sync3DColorsFromState(cubeState);
+      setupPointerListeners(renderer.domElement);
+
+      window.addEventListener('resize', onResizeCanvas);
+      requestAnimationFrame(renderLoop);
+    }
+
+    function createFaceLabelTexture(letter, subtext, bgColorHex, textHex) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = bgColorHex;
+      ctx.fillRect(0, 0, 256, 256);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(8, 8, 240, 240);
+
+      ctx.fillStyle = textHex;
+      ctx.font = '900 104px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(letter, 128, 114);
+
+      ctx.font = '700 34px Inter, sans-serif';
+      ctx.fillText(subtext, 128, 192);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    function build3DCubies() {
+      cubieMeshes.forEach(c => cubeRootGroup.remove(c));
+      cubieMeshes = [];
+      stickerMeshes = [];
+
+      const coreGeo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        roughness: 0.4,
+        metalness: 0.2
+      });
+
+      const stickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+      const spacing = 1.02;
+
+      for (let x = -1; x <= 1; x++) {
+        for (let y = -1; y <= 1; y++) {
+          for (let z = -1; z <= 1; z++) {
+            const cubie = new THREE.Group();
+            cubie.position.set(x * spacing, y * spacing, z * spacing);
+            cubie.userData = { gx: x, gy: y, gz: z };
+
+            const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+            cubie.add(coreMesh);
+
+            const checkFaces = [
+              { cond: y === 1,  face: 'U', pos: [0, 0.482, 0], rot: [-Math.PI / 2, 0, 0], n: [0, 1, 0] },
+              { cond: y === -1, face: 'D', pos: [0, -0.482, 0], rot: [Math.PI / 2, 0, 0], n: [0, -1, 0] },
+              { cond: z === 1,  face: 'F', pos: [0, 0, 0.482], rot: [0, 0, 0], n: [0, 0, 1] },
+              { cond: z === -1, face: 'B', pos: [0, 0, -0.482], rot: [0, Math.PI, 0], n: [0, 0, -1] },
+              { cond: x === -1, face: 'L', pos: [-0.482, 0, 0], rot: [0, -Math.PI / 2, 0], n: [-1, 0, 0] },
+              { cond: x === 1,  face: 'R', pos: [0.482, 0, 0], rot: [0, Math.PI / 2, 0], n: [1, 0, 0] }
+            ];
+
+            checkFaces.forEach(cf => {
+              if (!cf.cond) return;
+              const { face, idx } = coordsAndNormalToFaceIdx(x, y, z, cf.n[0], cf.n[1], cf.n[2]);
+              const mat = new THREE.MeshStandardMaterial({
+                color: 0x64748b,
+                roughness: 0.25,
+                metalness: 0.06
+              });
+              const sMesh = new THREE.Mesh(stickerGeo, mat);
+              sMesh.position.set(cf.pos[0], cf.pos[1], cf.pos[2]);
+              sMesh.rotation.set(cf.rot[0], cf.rot[1], cf.rot[2]);
+              sMesh.userData = { face, idx, isCenter: idx === 4 };
+
+              cubie.add(sMesh);
+              stickerMeshes.push(sMesh);
+            });
+
+            cubeRootGroup.add(cubie);
+            cubieMeshes.push(cubie);
+          }
+        }
+      }
+    }
+
+    const centerTextureCache = {};
+    function getCenterStickerTexture(face, colorCode) {
+      const key = `${currentLang}_${face}_${colorCode}`;
+      if (centerTextureCache[key]) return centerTextureCache[key];
+      const p = COLOR_MAP[colorCode] || COLOR_MAP.X;
+      const shortText = I18N[currentLang].centerShort[face] || face;
+      const tex = createFaceLabelTexture(face, shortText, p.hex, p.textHex);
+      centerTextureCache[key] = tex;
+      return tex;
+    }
+
+    function sync3DColorsFromState(st) {
+      stickerMeshes.forEach(mesh => {
+        const { face, idx, isCenter } = mesh.userData;
+        const code = st[face][idx] || 'X';
+        const p = COLOR_MAP[code] || COLOR_MAP.X;
+
+        if (isCenter) {
+          mesh.material.color.setHex(0xffffff);
+          mesh.material.map = getCenterStickerTexture(face, code);
+          mesh.material.needsUpdate = true;
+        } else {
+          mesh.material.map = null;
+          mesh.material.color.set(p.hex);
+          mesh.material.needsUpdate = true;
+        }
+      });
+    }
+
+    function updateCameraFromSpherical() {
+      if (!camera) return;
+      camPhi = Math.max(0.22, Math.min(Math.PI - 0.22, camPhi));
+      const x = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+      const y = camRadius * Math.cos(camPhi);
+      const z = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+      camera.position.set(x, y, z);
+      camera.lookAt(0, 0, 0);
+    }
+
+    function resetCameraView() {
+      camTheta = 0.68;
+      camPhi = 1.05;
+      camRadius = 9.2;
+      updateCameraFromSpherical();
+    }
+
+    function tweenCameraTo(tx, ty, tz) {
+      const r = Math.sqrt(tx * tx + ty * ty + tz * tz);
+      const targetPhi = Math.acos(ty / r);
+      const targetTheta = Math.atan2(tx, tz);
+      const startTheta = camTheta;
+      const startPhi = camPhi;
+      const startTime = performance.now();
+      const dur = 260;
+
+      function step(now) {
+        const t = Math.min(1, (now - startTime) / dur);
+        const ease = 1 - Math.pow(1 - t, 3);
+        camTheta = startTheta + (targetTheta - startTheta) * ease;
+        camPhi = startPhi + (targetPhi - startPhi) * ease;
+        updateCameraFromSpherical();
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function setTouchInteraction(mode) {
+      touchInteractionMode = mode;
+      const paintBtn = document.getElementById('touchPaintModeBtn');
+      const orbitBtn = document.getElementById('touchOrbitModeBtn');
+      if (mode === 'paint') {
+        paintBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 text-white';
+        orbitBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white';
+      } else {
+        paintBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white';
+        orbitBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-sky-600 text-white';
+      }
+    }
+
+    function getHoveredSticker(clientX, clientY) {
+      const dom = renderer.domElement;
+      const rect = dom.getBoundingClientRect();
+      mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouseNDC, camera);
+      const hits = raycaster.intersectObjects(stickerMeshes, false);
+      return hits.length > 0 ? hits[0].object : null;
+    }
+
+    function setupPointerListeners(dom) {
+      dom.addEventListener('contextmenu', e => e.preventDefault());
+
+      dom.addEventListener('pointerdown', e => {
+        isPointerDown = true;
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+        lastPointerPos = { x: e.clientX, y: e.clientY };
+
+        const hitSticker = getHoveredSticker(e.clientX, e.clientY);
+        if (e.button === 2 || touchInteractionMode === 'orbit' || appMode !== 'paint' || !hitSticker) {
+          isOrbitDragging = true;
+        } else {
+          isOrbitDragging = false;
+          paintSticker(hitSticker.userData.face, hitSticker.userData.idx);
+        }
+      });
+
+      window.addEventListener('pointermove', e => {
+        if (!isPointerDown) return;
+        const dx = e.clientX - lastPointerPos.x;
+        const dy = e.clientY - lastPointerPos.y;
+        lastPointerPos = { x: e.clientX, y: e.clientY };
+
+        if (isOrbitDragging) {
+          camTheta -= dx * 0.0085;
+          camPhi -= dy * 0.0085;
+          updateCameraFromSpherical();
+        } else if (appMode === 'paint' && touchInteractionMode === 'paint') {
+          const hitSticker = getHoveredSticker(e.clientX, e.clientY);
+          if (hitSticker) {
+            paintSticker(hitSticker.userData.face, hitSticker.userData.idx, true);
+          }
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        isPointerDown = false;
+        isOrbitDragging = false;
+      });
+
+      dom.addEventListener('wheel', e => {
+        e.preventDefault();
+        camRadius = Math.max(6.2, Math.min(14.5, camRadius + e.deltaY * 0.004));
+        updateCameraFromSpherical();
+      }, { passive: false });
+    }
+
+    function onResizeCanvas() {
+      const container = document.getElementById('canvasContainer');
+      if (!container || !renderer || !camera) return;
+      const w = container.clientWidth || 640;
+      const h = container.clientHeight || 460;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    function renderLoop() {
+      renderer.render(scene, camera);
+      requestAnimationFrame(renderLoop);
+    }
+
+    function animate3DMove(moveStr, durationMs = 260, onComplete) {
+      const spec = MOVE_SPECS[moveStr];
+      if (!spec || isAnimatingMove) {
+        if (onComplete) onComplete();
+        return;
+      }
+      isAnimatingMove = true;
+      playClickSound(340, 0.05);
+
+      const [ax, ay, az] = spec.axis;
+      const axisVec = new THREE.Vector3(ax, ay, az);
+      const totalAngle = (spec.turns === 3 ? 1 : -spec.turns) * (Math.PI / 2);
+
+      const activeCubies = cubieMeshes.filter(c => spec.filter(c.userData.gx, c.userData.gy, c.userData.gz));
+      pivotGroup.rotation.set(0, 0, 0);
+      activeCubies.forEach(c => pivotGroup.attach(c));
+
+      const startTime = performance.now();
+      function stepAnim(now) {
+        const t = Math.min(1, (now - startTime) / durationMs);
+        const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        pivotGroup.setRotationFromAxisAngle(axisVec, totalAngle * ease);
+
+        if (t < 1) {
+          requestAnimationFrame(stepAnim);
+        } else {
+          activeCubies.forEach(c => cubeRootGroup.attach(c));
+          pivotGroup.rotation.set(0, 0, 0);
+          const spacing = 1.02;
+          cubieMeshes.forEach(c => {
+            c.position.set(c.userData.gx * spacing, c.userData.gy * spacing, c.userData.gz * spacing);
+            c.rotation.set(0, 0, 0);
+          });
+          isAnimatingMove = false;
+          if (onComplete) onComplete();
+        }
+      }
+      requestAnimationFrame(stepAnim);
+    }
+
+    /*************************************************************************
+     * 7. UI RENDERING: PALETTE, 2D NET, VALIDATION & SOLVER CONTROLS
+     *************************************************************************/
+    function countColorsInState(st) {
+      const counts = { W: 0, Y: 0, R: 0, O: 0, G: 0, B: 0, X: 0 };
+      FACE_ORDER.forEach(f => {
+        st[f].forEach(c => {
+          counts[c] = (counts[c] || 0) + 1;
+        });
+      });
+      return counts;
+    }
+
+    function renderPaletteUI() {
+      const L = I18N[currentLang];
+      const container = document.getElementById('paletteContainer');
+      const counts = countColorsInState(cubeState);
+      const paintedTotal = 54 - (counts.X || 0);
+
+      document.getElementById('paintedCounterBadge').textContent = L.paintedCounter(paintedTotal);
+
+      const statusBadge = document.getElementById('statusBadge');
+      if (paintedTotal === 0) {
+        statusBadge.textContent = L.statusAllGray;
+        statusBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-700/80 text-slate-200 border border-slate-600';
+      } else if (paintedTotal < 54) {
+        statusBadge.textContent = L.statusPainting(paintedTotal);
+        statusBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
+      } else {
+        const v = validateCubeState(cubeState);
+        if (v.valid) {
+          statusBadge.textContent = L.statusValid;
+          statusBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        } else {
+          statusBadge.textContent = L.statusCheck;
+          statusBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40';
+        }
+      }
+
+      container.innerHTML = PALETTE.map(p => {
+        const isSelected = selectedColorCode === p.code;
+        const cnt = counts[p.code] || 0;
+        const countBadge = p.code === 'X'
+          ? `${cnt} ${L.cellsUnit}`
+          : `${cnt}/9`;
+        const countColorClass = p.code === 'X'
+          ? 'text-slate-300'
+          : (cnt === 9 ? 'text-emerald-300 font-extrabold' : (cnt > 9 ? 'text-rose-400 font-extrabold' : 'text-slate-300'));
+
+        return `
+          <button onclick="selectColor('${p.code}')"
+            class="swatch-btn ${isSelected ? 'active' : ''} flex flex-col items-center justify-between p-2 rounded-xl bg-slate-900/90 border border-slate-700/80 hover:border-slate-500">
+            <span class="w-7 h-7 rounded-lg shadow-inner border border-black/30 flex items-center justify-center text-[11px] font-black"
+              style="background:${p.hex}; color:${p.textHex}">
+              ${p.code === 'X' ? '✕' : p.code}
+            </span>
+            <span class="text-[11px] font-bold text-slate-200 mt-1 truncate max-w-full">${getColorName(p.code)}</span>
+            <span class="mono text-[10px] ${countColorClass}">${countBadge}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectColor(code) {
+      selectedColorCode = code;
+      playClickSound(440, 0.03);
+      renderPaletteUI();
+    }
+
+    function render2DNetUI() {
+      const L = I18N[currentLang];
+      const container = document.getElementById('net2DContainer');
+      const renderFaceGrid = (face) => {
+        const cells = cubeState[face].map((c, idx) => {
+          const p = COLOR_MAP[c] || COLOR_MAP.X;
+          const label = idx === 4 ? face : '';
+          return `
+            <div onclick="paintSticker('${face}', ${idx})"
+              title="${L.faceFullNames[face]} — ${L.cellLabel} ${idx + 1}"
+              class="net-cell"
+              style="background:${p.hex}; color:${p.textHex}">
+              ${label}
+            </div>
+          `;
+        }).join('');
+        return `
+          <div class="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-950/90 border border-slate-800">
+            ${cells}
+          </div>
+        `;
+      };
+
+      container.innerHTML = `
+        <div class="grid grid-cols-4 gap-1.5 items-center">
+          <div></div>
+          ${renderFaceGrid('U')}
+          <div></div>
+          <div></div>
+
+          ${renderFaceGrid('L')}
+          ${renderFaceGrid('F')}
+          ${renderFaceGrid('R')}
+          ${renderFaceGrid('B')}
+
+          <div></div>
+          ${renderFaceGrid('D')}
+          <div></div>
+          <div></div>
+        </div>
+      `;
+    }
+
+    function updateValidationUI() {
+      const L = I18N[currentLang];
+      const check = validateCubeState(cubeState);
+      const box = document.getElementById('validationBox');
+      const titleEl = document.getElementById('validationTitle');
+      const msgEl = document.getElementById('validationMessage');
+      const fixBtn = document.getElementById('autoFixBtn');
+
+      if (check.valid) {
+        box.className = 'rounded-xl p-3 bg-emerald-950/40 border border-emerald-500/40 text-xs space-y-1.5';
+        titleEl.innerHTML = L.valTitleValid;
+        titleEl.className = 'font-bold text-emerald-300';
+        msgEl.textContent = check.message;
+        fixBtn.classList.add('hidden');
+      } else if (check.code === 'INCOMPLETE') {
+        box.className = 'rounded-xl p-3 bg-slate-900/90 border border-slate-700/80 text-xs space-y-1.5';
+        titleEl.innerHTML = L.valTitleIncomplete;
+        titleEl.className = 'font-bold text-sky-300';
+        msgEl.textContent = check.message;
+        fixBtn.classList.add('hidden');
+      } else {
+        box.className = 'rounded-xl p-3 bg-rose-950/40 border border-rose-500/40 text-xs space-y-1.5';
+        titleEl.innerHTML = L.valTitleInvalid;
+        titleEl.className = 'font-bold text-rose-300';
+        msgEl.textContent = check.message;
+        fixBtn.classList.remove('hidden');
+      }
+    }
+
+    function paintSticker(face, idx, isDrag = false) {
+      if (appMode !== 'paint') return;
+      if (cubeState[face][idx] === selectedColorCode && isDrag) return;
+      cubeState[face][idx] = selectedColorCode;
+      activeCaseId = null;
+      playClickSound(520, 0.025);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+    }
+
+    function resetAllToGray() {
+      stopAutoPlay();
+      activeCaseId = null;
+      currentSolution = null;
+      cubeState = createEmptyGrayState();
+      playClickSound(260, 0.06);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+    }
+
+    function fillStandardCentersOnly() {
+      PALETTE.forEach(p => {
+        if (p.stdFace) cubeState[p.stdFace][4] = p.code;
+      });
+      playClickSound(420, 0.05);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+    }
+
+    function loadSolvedCube() {
+      stopAutoPlay();
+      activeCaseId = null;
+      cubeState = createSolvedState();
+      playClickSound(500, 0.06);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+    }
+
+    function scrambleRandomValidCube() {
+      stopAutoPlay();
+      activeCaseId = null;
+      let st = createSolvedState();
+      const moves = ['U', "U'", 'U2', 'D', "D'", 'D2', 'F', "F'", 'F2', 'B', "B'", 'B2', 'L', "L'", 'L2', 'R', "R'", 'R2'];
+      let lastFace = '';
+      for (let i = 0; i < 20; i++) {
+        const candidates = moves.filter(m => m[0] !== lastFace);
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        lastFace = pick[0];
+        st = applyMoveToState(st, pick);
+      }
+      cubeState = st;
+      playClickSound(460, 0.06);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+    }
+
+    function autoFillRemainingColor() {
+      const counts = countColorsInState(cubeState);
+      if (counts.X === 0) return;
+
+      const usedCenters = new Set();
+      FACE_ORDER.forEach(f => {
+        if (cubeState[f][4] !== 'X') usedCenters.add(cubeState[f][4]);
+      });
+      const allColorCodes = ['W', 'Y', 'R', 'O', 'G', 'B'];
+      FACE_ORDER.forEach(f => {
+        if (cubeState[f][4] === 'X') {
+          const defColor = PALETTE.find(p => p.stdFace === f).code;
+          const pick = !usedCenters.has(defColor) ? defColor : allColorCodes.find(c => !usedCenters.has(c));
+          cubeState[f][4] = pick;
+          usedCenters.add(pick);
+        }
+      });
+
+      const cAfter = countColorsInState(cubeState);
+      const missingColors = [];
+      allColorCodes.forEach(c => {
+        const deficit = 9 - (cAfter[c] || 0);
+        for (let i = 0; i < deficit; i++) missingColors.push(c);
+      });
+
+      if (missingColors.length === cAfter.X && missingColors.length <= 9) {
+        let ptr = 0;
+        FACE_ORDER.forEach(f => {
+          for (let idx = 0; idx < 9; idx++) {
+            if (cubeState[f][idx] === 'X' && ptr < missingColors.length) {
+              cubeState[f][idx] = missingColors[ptr++];
+            }
+          }
+        });
+      } else {
+        autoRepairCubeState();
+        return;
+      }
+
+      playClickSound(540, 0.05);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+    }
+
+    function autoRepairCubeState() {
+      const allColorCodes = ['W', 'Y', 'R', 'O', 'G', 'B'];
+      const usedCenters = new Set();
+      FACE_ORDER.forEach(f => {
+        const c = cubeState[f][4];
+        if (c !== 'X' && !usedCenters.has(c)) {
+          usedCenters.add(c);
+        } else {
+          cubeState[f][4] = 'X';
+        }
+      });
+      FACE_ORDER.forEach(f => {
+        if (cubeState[f][4] === 'X') {
+          const std = PALETTE.find(p => p.stdFace === f).code;
+          const pick = !usedCenters.has(std) ? std : allColorCodes.find(c => !usedCenters.has(c));
+          cubeState[f][4] = pick;
+          usedCenters.add(pick);
+        }
+      });
+
+      const repaired = createEmptyGrayState();
+      FACE_ORDER.forEach(f => { repaired[f][4] = cubeState[f][4]; });
+
+      const availEdges = EDGE_POSITIONS.map((_, i) => i);
+      const assignedEdges = [];
+      const edgeOrients = [];
+
+      for (let i = 0; i < EDGE_POSITIONS.length; i++) {
+        const pos = EDGE_POSITIONS[i];
+        const s0 = getStickerAtCubieFace(cubeState, pos.coords, pos.faces[0]);
+        const s1 = getStickerAtCubieFace(cubeState, pos.coords, pos.faces[1]);
+
+        let bestIdx = availEdges[0];
+        let bestOrient = 0;
+        let bestScore = -1;
+
+        for (const candIdx of availEdges) {
+          const cand = EDGE_POSITIONS[candIdx];
+          const tc0 = cubeState[cand.faces[0]][4];
+          const tc1 = cubeState[cand.faces[1]][4];
+
+          const score0 = (s0 === tc0 ? 1 : 0) + (s1 === tc1 ? 1 : 0);
+          if (score0 > bestScore) {
+            bestScore = score0; bestIdx = candIdx; bestOrient = 0;
+          }
+          const score1 = (s0 === tc1 ? 1 : 0) + (s1 === tc0 ? 1 : 0);
+          if (score1 > bestScore) {
+            bestScore = score1; bestIdx = candIdx; bestOrient = 1;
+          }
+        }
+        assignedEdges.push(bestIdx);
+        edgeOrients.push(bestOrient);
+        availEdges.splice(availEdges.indexOf(bestIdx), 1);
+      }
+
+      const flipSum = edgeOrients.reduce((a, b) => a + b, 0);
+      if (flipSum % 2 !== 0) {
+        edgeOrients[edgeOrients.length - 1] ^= 1;
+      }
+
+      const availCorners = CORNER_POSITIONS.map((_, i) => i);
+      const assignedCorners = [];
+      const cornerTwists = [];
+
+      for (let i = 0; i < CORNER_POSITIONS.length; i++) {
+        const pos = CORNER_POSITIONS[i];
+        const actual = pos.faces.map(f => getStickerAtCubieFace(cubeState, pos.coords, f));
+
+        let bestIdx = availCorners[0];
+        let bestTwist = 0;
+        let bestScore = -1;
+
+        for (const candIdx of availCorners) {
+          const cand = CORNER_POSITIONS[candIdx];
+          const targetCols = cand.faces.map(f => cubeState[f][4]);
+          for (let tw = 0; tw < 3; tw++) {
+            let sc = 0;
+            for (let k = 0; k < 3; k++) {
+              if (actual[(k + tw) % 3] === targetCols[k]) sc++;
+            }
+            if (sc > bestScore) {
+              bestScore = sc; bestIdx = candIdx; bestTwist = tw;
+            }
+          }
+        }
+        assignedCorners.push(bestIdx);
+        cornerTwists.push(bestTwist);
+        availCorners.splice(availCorners.indexOf(bestIdx), 1);
+      }
+
+      const twistSum = cornerTwists.reduce((a, b) => a + b, 0);
+      if (twistSum % 3 !== 0) {
+        cornerTwists[cornerTwists.length - 1] = (cornerTwists[cornerTwists.length - 1] + (3 - (twistSum % 3))) % 3;
+      }
+
+      const countInv = (arr) => {
+        let inv = 0;
+        for (let i = 0; i < arr.length; i++)
+          for (let j = i + 1; j < arr.length; j++)
+            if (arr[i] > arr[j]) inv++;
+        return inv;
+      };
+      if ((countInv(assignedEdges) % 2) !== (countInv(assignedCorners) % 2)) {
+        const tmp = assignedEdges[10];
+        assignedEdges[10] = assignedEdges[11];
+        assignedEdges[11] = tmp;
+      }
+
+      for (let i = 0; i < EDGE_POSITIONS.length; i++) {
+        const pos = EDGE_POSITIONS[i];
+        const piece = EDGE_POSITIONS[assignedEdges[i]];
+        const c0 = cubeState[piece.faces[0]][4];
+        const c1 = cubeState[piece.faces[1]][4];
+        const [out0, out1] = edgeOrients[i] === 0 ? [c0, c1] : [c1, c0];
+        const idx0 = coordsAndNormalToFaceIdx(...pos.coords, ...faceNormalVec(pos.faces[0])).idx;
+        const idx1 = coordsAndNormalToFaceIdx(...pos.coords, ...faceNormalVec(pos.faces[1])).idx;
+        repaired[pos.faces[0]][idx0] = out0;
+        repaired[pos.faces[1]][idx1] = out1;
+      }
+
+      for (let i = 0; i < CORNER_POSITIONS.length; i++) {
+        const pos = CORNER_POSITIONS[i];
+        const piece = CORNER_POSITIONS[assignedCorners[i]];
+        const targetCols = piece.faces.map(f => cubeState[f][4]);
+        const tw = cornerTwists[i];
+        for (let k = 0; k < 3; k++) {
+          const destFace = pos.faces[(k + tw) % 3];
+          const idx = coordsAndNormalToFaceIdx(...pos.coords, ...faceNormalVec(destFace)).idx;
+          repaired[destFace][idx] = targetCols[k];
+        }
+      }
+
+      cubeState = repaired;
+      playClickSound(580, 0.06);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+    }
+
+    /*************************************************************************
+     * 8. SOLVER WORKFLOW & STEP-BY-STEP PLAYBACK
+     *************************************************************************/
+    function setAppMode(mode) {
+      const L = I18N[currentLang];
+      appMode = mode;
+      stopAutoPlay();
+
+      const tabPaint = document.getElementById('tabPaintBtn');
+      const tabSolve = document.getElementById('tabSolveBtn');
+      const tabCases = document.getElementById('tabCasesBtn');
+
+      const panelPaint = document.getElementById('panelPaint');
+      const panelSolve = document.getElementById('panelSolve');
+      const panelCases = document.getElementById('panelCases');
+
+      const labelEl = document.getElementById('viewportModeLabel');
+      const hintEl = document.getElementById('viewportHintText');
+
+      tabPaint.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white';
+      tabSolve.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white';
+      tabCases.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white';
+
+      panelPaint.classList.add('hidden');
+      panelSolve.classList.add('hidden');
+      panelCases.classList.add('hidden');
+
+      if (mode === 'paint') {
+        tabPaint.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition bg-sky-600 text-white shadow';
+        panelPaint.classList.remove('hidden');
+        panelPaint.classList.add('flex');
+        labelEl.textContent = L.modePaint;
+        hintEl.textContent = L.hintPaint;
+        sync3DColorsFromState(cubeState);
+      } else if (mode === 'solve') {
+        tabSolve.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition bg-sky-600 text-white shadow';
+        panelSolve.classList.remove('hidden');
+        panelSolve.classList.add('flex');
+        labelEl.textContent = L.modeSolve;
+        hintEl.textContent = L.hintSolve;
+        if (!currentSolution) {
+          analyzeAndSolveCube(true);
+        }
+      } else if (mode === 'cases') {
+        tabCases.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition bg-sky-600 text-white shadow';
+        panelCases.classList.remove('hidden');
+        panelCases.classList.add('flex');
+        labelEl.textContent = L.modeCases;
+        hintEl.textContent = L.hintCases;
+      }
+    }
+
+    function analyzeAndSolveCube(silentIfIncomplete = false) {
+      stopAutoPlay();
+      activeCaseId = null;
+      const check = validateCubeState(cubeState);
+      if (!check.valid) {
+        if (!silentIfIncomplete) {
+          setAppMode('paint');
+          updateValidationUI();
+        } else {
+          renderEmptySolvePanel(check.message);
+        }
+        return;
+      }
+
+      const sol = solveCubeLayerByLayer(cubeState);
+      if (!sol.ok) {
+        renderEmptySolvePanel(sol.error || 'Error');
+        return;
+      }
+
+      currentSolution = sol;
+      solutionSnapshots = [cloneState(cubeState)];
+      let s = cloneState(cubeState);
+      for (const step of sol.steps) {
+        s = applyMoveToState(s, step.move);
+        solutionSnapshots.push(cloneState(s));
+      }
+      currentStepIndex = 0;
+
+      if (appMode !== 'solve') {
+        setAppMode('solve');
+      }
+      sync3DColorsFromState(solutionSnapshots[0]);
+      renderSolvePanelUI();
+    }
+
+    function renderEmptySolvePanel(msg) {
+      const L = I18N[currentLang];
+      document.getElementById('solveSummarySubtitle').textContent = L.solveEmptySubtitle;
+      document.getElementById('currentStageBadge').textContent = L.solveEmptyBadge;
+      document.getElementById('stepProgressText').textContent = L.stepProgress(0, 0);
+      document.getElementById('currentMoveSymbol').textContent = '!';
+      document.getElementById('currentMoveDirShort').textContent = 'Check';
+      document.getElementById('currentMoveTitle').textContent = L.solveEmptyTitle;
+      document.getElementById('currentMoveDesc').textContent = msg;
+      document.getElementById('stagesListContainer').innerHTML = `
+        <div class="rounded-xl p-4 bg-slate-900/80 border border-slate-700 text-xs text-slate-300 space-y-2">
+          <p>${msg}</p>
+          <div class="flex flex-wrap gap-2 pt-1">
+            <button onclick="setAppMode('paint')" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold">
+              ${L.solveBtnBackPaint}
+            </button>
+            <button onclick="scrambleRandomValidCube(); analyzeAndSolveCube();" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold">
+              ${L.solveBtnScrambleNow}
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSolvePanelUI() {
+      if (!currentSolution) return;
+      const L = I18N[currentLang];
+      const total = currentSolution.steps.length;
+      const subEl = document.getElementById('solveSummarySubtitle');
+      const badgeEl = document.getElementById('currentStageBadge');
+      const progEl = document.getElementById('stepProgressText');
+      const symEl = document.getElementById('currentMoveSymbol');
+      const shortEl = document.getElementById('currentMoveDirShort');
+      const titleEl = document.getElementById('currentMoveTitle');
+      const descEl = document.getElementById('currentMoveDesc');
+
+      if (total === 0) {
+        subEl.textContent = L.solveAlreadyDoneSub;
+        badgeEl.textContent = L.solveAlreadyDoneBadge;
+        progEl.textContent = L.stepProgress(0, 0);
+        symEl.textContent = '✓';
+        shortEl.textContent = L.allSolvedShort;
+        titleEl.textContent = L.solveAlreadyDoneTitle;
+        descEl.textContent = L.solveAlreadyDoneDesc;
+        document.getElementById('stagesListContainer').innerHTML = '';
+        return;
+      }
+
+      subEl.textContent = L.solveTotalSub(total);
+      progEl.textContent = L.stepProgress(currentStepIndex, total);
+
+      if (currentStepIndex === 0) {
+        const nextStep = currentSolution.steps[0];
+        badgeEl.textContent = L.prepStagePrefix(nextStep.stageName);
+        symEl.textContent = nextStep.move;
+        shortEl.textContent = L.nextShortPrefix(nextStep.short);
+        titleEl.textContent = L.step1NextTitle(nextStep.title);
+        descEl.textContent = `${nextStep.desc} ${L.holdOrientationNote(getColorName(solutionSnapshots[0].F[4]), getColorName(solutionSnapshots[0].U[4]))}`;
+      } else if (currentStepIndex >= total) {
+        badgeEl.textContent = L.allSolvedBadge;
+        symEl.textContent = '✓';
+        shortEl.textContent = L.allSolvedShort;
+        titleEl.textContent = L.allSolvedTitle;
+        descEl.textContent = L.allSolvedDesc;
+      } else {
+        const curStep = currentSolution.steps[currentStepIndex - 1];
+        const nextStep = currentSolution.steps[currentStepIndex];
+        badgeEl.textContent = curStep.stageName;
+        symEl.textContent = curStep.move;
+        shortEl.textContent = curStep.short;
+        titleEl.textContent = L.executedStepTitle(currentStepIndex, curStep.title);
+        descEl.textContent = `${curStep.desc} • ${L.nextStepInline(currentStepIndex + 1, nextStep.move, nextStep.short)}`;
+      }
+
+      let globalCounter = 0;
+      const stagesHtml = currentSolution.stages.map(st => {
+        if (st.moves.length === 0) {
+          return `
+            <div class="rounded-xl p-2.5 bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-400">${st.name}</span>
+              <span class="text-[11px] font-semibold text-emerald-400">${L.stageAlreadyDone}</span>
+            </div>
+          `;
+        }
+        const chips = st.moves.map(m => {
+          globalCounter++;
+          const stepIdx = globalCounter;
+          let cls = 'bg-slate-800 text-slate-200 border-slate-700 hover:border-sky-400';
+          if (stepIdx === currentStepIndex) cls = 'current';
+          else if (stepIdx < currentStepIndex) cls = 'done';
+          return `
+            <button onclick="jumpToStep(${stepIdx})"
+              class="step-chip mono text-xs font-bold px-2.5 py-1 rounded-lg border ${cls}">
+              <span class="text-[10px] opacity-70 mr-0.5">${stepIdx}.</span>${m}
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <div class="rounded-xl p-3 bg-slate-900/85 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-extrabold text-sky-300">${st.name}</span>
+              <span class="mono text-[11px] text-slate-400">${L.movesCountUnit(st.moves.length)}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 leading-relaxed">${st.tip}</p>
+            <div class="flex flex-wrap gap-1.5 pt-0.5">${chips}</div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('stagesListContainer').innerHTML = stagesHtml;
+    }
+
+    function stepForward() {
+      if (!currentSolution || isAnimatingMove) return;
+      if (currentStepIndex >= currentSolution.steps.length) {
+        stopAutoPlay();
+        return;
+      }
+      const stepObj = currentSolution.steps[currentStepIndex];
+      currentStepIndex++;
+      animate3DMove(stepObj.move, Math.min(360, playSpeedMs * 0.72), () => {
+        cubeState = cloneState(solutionSnapshots[currentStepIndex]);
+        sync3DColorsFromState(cubeState);
+        renderPaletteUI();
+        render2DNetUI();
+        renderSolvePanelUI();
+      });
+    }
+
+    function stepBackward() {
+      stopAutoPlay();
+      if (!currentSolution || isAnimatingMove || currentStepIndex <= 0) return;
+      currentStepIndex--;
+      cubeState = cloneState(solutionSnapshots[currentStepIndex]);
+      playClickSound(290, 0.04);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      renderSolvePanelUI();
+    }
+
+    function jumpToStep(idx) {
+      stopAutoPlay();
+      if (!currentSolution || isAnimatingMove) return;
+      currentStepIndex = Math.max(0, Math.min(currentSolution.steps.length, idx));
+      cubeState = cloneState(solutionSnapshots[currentStepIndex]);
+      playClickSound(400, 0.04);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      renderSolvePanelUI();
+    }
+
+    function jumpToEnd() {
+      if (!currentSolution) return;
+      jumpToStep(currentSolution.steps.length);
+    }
+
+    function toggleAutoPlay() {
+      if (!currentSolution || currentSolution.steps.length === 0) return;
+      const L = I18N[currentLang];
+      if (isAutoPlaying) {
+        stopAutoPlay();
+      } else {
+        if (currentStepIndex >= currentSolution.steps.length) {
+          jumpToStep(0);
+        }
+        isAutoPlaying = true;
+        const btn = document.getElementById('playPauseBtn');
+        btn.textContent = L.btnPause;
+        btn.className = 'py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-xs font-extrabold text-white transition shadow';
+        runAutoPlayTick();
+      }
+    }
+
+    function runAutoPlayTick() {
+      if (!isAutoPlaying) return;
+      if (!currentSolution || currentStepIndex >= currentSolution.steps.length) {
+        stopAutoPlay();
+        return;
+      }
+      stepForward();
+      autoPlayTimer = setTimeout(runAutoPlayTick, playSpeedMs);
+    }
+
+    function stopAutoPlay() {
+      isAutoPlaying = false;
+      if (autoPlayTimer) {
+        clearTimeout(autoPlayTimer);
+        autoPlayTimer = null;
+      }
+      const btn = document.getElementById('playPauseBtn');
+      if (btn) {
+        btn.textContent = I18N[currentLang].btnPlay;
+        btn.className = 'py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-extrabold text-white transition shadow';
+      }
+    }
+
+    function setPlaySpeed(ms) {
+      playSpeedMs = ms;
+      document.getElementById('spdSlow').className = ms === 950 ? 'px-2 py-0.5 rounded bg-sky-600 text-white font-semibold' : 'px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold';
+      document.getElementById('spdMed').className = ms === 520 ? 'px-2 py-0.5 rounded bg-sky-600 text-white font-semibold' : 'px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold';
+      document.getElementById('spdFast').className = ms === 220 ? 'px-2 py-0.5 rounded bg-sky-600 text-white font-semibold' : 'px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold';
+    }
+
+    /*************************************************************************
+     * 9. DIRECT MANUAL ROTATION & 4-STEP DEMO
+     *************************************************************************/
+    function userMove(moveStr) {
+      if (isAnimatingMove) return;
+      stopAutoPlay();
+      const counts = countColorsInState(cubeState);
+      if (counts.X === 54) {
+        cubeState = createSolvedState();
+        sync3DColorsFromState(cubeState);
+      }
+      animate3DMove(moveStr, 210, () => {
+        cubeState = applyMoveToState(cubeState, moveStr);
+        sync3DColorsFromState(cubeState);
+        renderPaletteUI();
+        render2DNetUI();
+        updateValidationUI();
+        if (appMode === 'solve') {
+          analyzeAndSolveCube(true);
+        }
+      });
+    }
+
+    function triggerRule4StepsDemo() {
+      if (isAnimatingMove) return;
+      stopAutoPlay();
+      const counts = countColorsInState(cubeState);
+      if (counts.X === 54) {
+        cubeState = createSolvedState();
+        sync3DColorsFromState(cubeState);
+      }
+      const seq = ['R', 'U', "R'", "U'"];
+      let idx = 0;
+      function nextInDemo() {
+        if (idx >= seq.length) {
+          renderPaletteUI();
+          render2DNetUI();
+          updateValidationUI();
+          return;
+        }
+        const m = seq[idx++];
+        animate3DMove(m, 230, () => {
+          cubeState = applyMoveToState(cubeState, m);
+          sync3DColorsFromState(cubeState);
+          setTimeout(nextInDemo, 60);
+        });
+      }
+      nextInDemo();
+    }
+
+    /*************************************************************************
+     * 10. RENDER CASE LIBRARY & LOAD SPECIFIC CASE TO 3D CUBE
+     *************************************************************************/
+    function renderCaseLibraryUI() {
+      const L = I18N[currentLang];
+      const container = document.getElementById('casesListContainer');
+      container.innerHTML = CASE_LIBRARY.map(c => {
+        const loc = c.i18n[currentLang] || c.i18n.en;
+        return `
+          <div class="rounded-xl p-3 bg-slate-900/85 border border-slate-800 hover:border-slate-700 transition space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-sky-400">${loc.stage}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${loc.badge}</span>
+            </div>
+            <h3 class="text-xs font-extrabold text-white">${loc.title}</h3>
+            <p class="text-[11px] text-slate-300 leading-relaxed">${loc.desc}</p>
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div class="mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-950 text-amber-300 border border-slate-800">
+                ${L.formulaLabel} ${c.formula}
+              </div>
+              <button onclick="loadCaseTo3D('${c.id}')"
+                class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition shadow">
+                ${L.loadCaseBtn}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function loadCaseTo3D(caseId) {
+      const item = CASE_LIBRARY.find(c => c.id === caseId);
+      if (!item) return;
+      stopAutoPlay();
+      activeCaseId = caseId;
+      const loc = item.i18n[currentLang] || item.i18n.en;
+
+      const base = {
+        U: Array(9).fill('Y'),
+        D: Array(9).fill('W'),
+        F: Array(9).fill('R'),
+        B: Array(9).fill('O'),
+        L: Array(9).fill('G'),
+        R: Array(9).fill('B')
+      };
+      cubeState = applyMoveSequence(base, item.setupInverse);
+      sync3DColorsFromState(cubeState);
+      renderPaletteUI();
+      render2DNetUI();
+      updateValidationUI();
+
+      const moves = item.formula.trim().split(/\s+/).filter(Boolean);
+      const steps = moves.map((m, i) => {
+        const exp = getMoveExp(m);
+        return {
+          index: i + 1,
+          move: m,
+          stageId: 1,
+          stageName: loc.title,
+          stageTip: loc.desc,
+          stepInStage: i + 1,
+          totalInStage: moves.length,
+          title: exp.title,
+          short: exp.short,
+          desc: exp.desc
+        };
+      });
+
+      currentSolution = {
+        ok: true,
+        stages: [{
+          id: 1,
+          name: loc.title,
+          tip: loc.desc,
+          moves
+        }],
+        steps,
+        flatMoves: moves
+      };
+
+      solutionSnapshots = [cloneState(cubeState)];
+      let s = cloneState(cubeState);
+      for (const m of moves) {
+        s = applyMoveToState(s, m);
+        solutionSnapshots.push(cloneState(s));
+      }
+      currentStepIndex = 0;
+      setAppMode('solve');
+      renderSolvePanelUI();
+    }
+
+    /*************************************************************************
+     * 11. INITIALIZATION ON WINDOW LOAD (DEFAULT = ENGLISH 'en')
+     *************************************************************************/
+    window.onload = function () {
+      initThreeScene();
+      setLanguage('en');
+    };
+  </script>
+</body>
+</html>
